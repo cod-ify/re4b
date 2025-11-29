@@ -2,12 +2,20 @@ import { useState, useEffect } from "react";
 
 export const useLocalStorage = (defaultValue, key) => {
   const [value, setValue] = useState(() => {
-    const stickyValue = window.localStorage.getItem(key);
-    return stickyValue !== null ? JSON.parse(stickyValue) : defaultValue;
+    try {
+      const stickyValue = window.localStorage.getItem(key);
+      return stickyValue !== null ? JSON.parse(stickyValue) : defaultValue;
+    } catch (error) {
+      return defaultValue;
+    }
   });
 
   useEffect(() => {
-    window.localStorage.setItem(key, JSON.stringify(value));
+    try {
+      window.localStorage.setItem(key, JSON.stringify(value));
+    } catch (error) {
+      console.warn(`LocalStorage quota exceeded. Unable to save "${key}".`);
+    }
   }, [key, value]);
 
   return [value, setValue];

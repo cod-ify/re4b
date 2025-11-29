@@ -15,24 +15,16 @@ app.use(express.json({ limit: "50mb" }));
 const projectId = process.env.GCLOUD_PROJECT;
 const location = process.env.GCLOUD_LOCATION || "us-central1";
 
-// Initialize Vertex AI Client
 const vertex_ai = new VertexAI({ project: projectId, location });
 
 // --- Models ---
-
-// 1. ANALYSIS MODEL: Gemini 2.5 Flash
-// Best for high-speed, accurate multimodal understanding (reading the room geometry)
 const geminiAnalysisModel = vertex_ai.preview.getGenerativeModel({
   model: "gemini-2.5-flash",
 });
-
-// 2. GENERATION MODEL: Gemini 2.5 Flash Image
-// Specialized for high-fidelity image generation
 const geminiImageModel = vertex_ai.preview.getGenerativeModel({
   model: "gemini-2.5-flash-image",
 });
 
-// Helper
 const fileToGenerativePart = (base64DataUrl) => {
   const matches = base64DataUrl.match(/^data:(.+);base64,(.+)$/);
   if (!matches || matches.length < 3) throw new Error("Invalid base64 image");
@@ -41,7 +33,6 @@ const fileToGenerativePart = (base64DataUrl) => {
 
 /**
  * Endpoint 1: Magic Prompt Enhancer
- * Uses the Analysis model (Flash 2.5) for text tasks
  */
 app.post("/api/enhance-prompt", async (req, res) => {
   try {
@@ -49,7 +40,8 @@ app.post("/api/enhance-prompt", async (req, res) => {
       req.body;
     const chat = geminiAnalysisModel.startChat({});
 
-    const input = `You are an expert architectural photographer. Convert this user request into a precise prompt for an AI image generator.
+    // STRICT System Instruction to prevent hallucinated camera angles
+    const input = `You are an expert interior design photographer. Convert this user request into a precise prompt for an AI image generator.
     
     User Request: "${prompt}"
     Room: ${roomType}, Style: ${style}
@@ -57,22 +49,23 @@ app.post("/api/enhance-prompt", async (req, res) => {
     - Structure: ${maintainStructure ? "Strictly maintained" : "Flexible"}
     - Furniture: ${maintainFurniture ? "Strictly maintained" : "Flexible"}
 
-    Focus on lighting (e.g. "soft diffuse daylight"), materials (e.g. "white oak", "calacatta marble"), and atmosphere. 
-    Output ONLY the enhanced prompt text.`;
+    IMPORTANT: Do NOT describe camera angles, focal lengths, or structural changes (like moving windows/doors). 
+    Focus ONLY on lighting (e.g. "soft diffuse daylight"), materials (e.g. "velvet", "oak"), and atmosphere.
+    Output ONLY the enhanced prompt.`;
 
     const result = await chat.sendMessage(input);
-    const response = result.response.candidates[0].content.parts[0].text;
-    res.json({ success: true, enhancedPrompt: response.trim() });
+    res.json({
+      success: true,
+      enhancedPrompt:
+        result.response.candidates[0].content.parts[0].text.trim(),
+    });
   } catch (error) {
-    console.error("Enhance Error:", error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
 
 /**
- * Endpoint 2: Generate Design (Grounding Pipeline)
- * Step 1: Gemini 2.5 Flash analyzes the scene.
- * Step 2: Gemini 2.5 Flash Image generates the result.
+ * Endpoint 2: Generate Design
  */
 app.post("/api/generate-design", async (req, res) => {
   try {
@@ -91,89 +84,68 @@ app.post("/api/generate-design", async (req, res) => {
       `Processing: ${roomType} in ${style} style (Structure: ${maintainStructure}, Furniture: ${maintainFurniture})...`
     );
 
-    // --- STEP 1: ANALYSIS (Gemini 2.5 Flash) ---
-    // We ask Gemini to describe the room's geometry so the generator knows what to keep.
-    let sceneDescription = "A standard room interior.";
-
-    if (maintainStructure || maintainFurniture) {
-      console.log("Analyzing scene geometry with Gemini 2.5 Flash...");
-      const analysisPrompt = `
-        Analyze this interior image of a ${roomType}. 
-        Provide a concise, strictly factual description of:
-        1. The architectural geometry (window positions, ceiling height, beams, door locations).
-        2. The layout of the main furniture pieces (e.g. "L-shaped sofa on left, TV console on right wall").
-        
-        Do not describe colors or decor style. Only describe SHAPES and POSITIONS.
-      `;
-
-      const analysisReq = {
-        contents: [
-          {
-            role: "user",
-            parts: [{ text: analysisPrompt }, fileToGenerativePart(image)],
-          },
-        ],
-      };
-
-      const analysisResult = await geminiAnalysisModel.generateContent(
-        analysisReq
-      );
-      if (analysisResult.response.candidates?.[0]?.content?.parts?.[0]?.text) {
-        sceneDescription =
-          analysisResult.response.candidates[0].content.parts[0].text;
-        console.log(
-          "Detected Geometry:",
-          sceneDescription.slice(0, 100) + "..."
-        );
-      }
-    }
-
-    // --- STEP 2: GENERATION (Gemini 2.5 Flash Image) ---
-    console.log("Generating image with Gemini 2.5 Flash Image...");
-
-    const constraintText =
-      maintainStructure || maintainFurniture
-        ? `Ensure the architectural layout and furniture placement matches this description exactly: ${sceneDescription}`
-        : "You are free to reimagine the layout.";
-
-    const fullPrompt = `
-      Create a photorealistic, high-resolution image of a ${roomType} designed in a ${style} style.
-      
-      [Constraints]
-      ${constraintText}
-      
-      [Design Details]
-      Palette: ${colorPalette}
-      Atmosphere: ${
-        prompt ||
-        "High-end interior design, architectural digest style, soft natural lighting."
-      }
-      
-      Return an image.
+    // STEP 1: ANALYSIS
+    let furnitureList = "standard furniture";
+    console.log("Analyzing scene geometry and furniture...");
+    const analysisPrompt = `
+      Analyze this interior image of a ${roomType}. 
+      1. List the architectural geometry (window positions, ceiling height, beams, door locations).
+      2. List every major piece of furniture visible (e.g. "L-shaped sofa, coffee table, arm chair").
+      Do not describe colors or decor style. Only describe SHAPES and POSITIONS.
     `;
-
-    const genRequest = {
+    const analysisReq = {
       contents: [
         {
           role: "user",
-          parts: [
-            { text: fullPrompt },
-            // We provide the image again as reference for the generation model
-            fileToGenerativePart(image),
-          ],
+          parts: [{ text: analysisPrompt }, fileToGenerativePart(image)],
         },
       ],
     };
+    const analysisResult = await geminiAnalysisModel.generateContent(
+      analysisReq
+    );
+    if (analysisResult.response.candidates?.[0]?.content?.parts?.[0]?.text) {
+      furnitureList =
+        analysisResult.response.candidates[0].content.parts[0].text;
+    }
 
-    const result = await geminiImageModel.generateContent(genRequest);
+    // STEP 2: GENERATION
+    console.log("Generating image...");
+    let constraintInstruction = "";
+
+    if (maintainStructure && maintainFurniture) {
+      constraintInstruction = `CRITICAL: PRESERVE EVERYTHING. Keep architecture and furniture exactly as described: "${furnitureList}". Do not move objects. Only update materials/colors.`;
+    } else if (maintainStructure && !maintainFurniture) {
+      constraintInstruction = `CRITICAL: PRESERVE ARCHITECTURE ONLY. Keep walls/windows as described: "${furnitureList}". HOWEVER, REMOVE AND REPLACE ALL FURNITURE. The room currently contains: ${furnitureList}. Ignore these shapes. Furnish the room from scratch with new ${style} furniture.`;
+    } else if (!maintainStructure && maintainFurniture) {
+      constraintInstruction = `CRITICAL: PRESERVE FURNITURE LAYOUT. Keep furniture placement: "${furnitureList}". You may redesign the walls/windows.`;
+    } else {
+      constraintInstruction = `CREATIVE FREEDOM: Reimagine the entire room layout and architecture.`;
+    }
+
+    const fullPrompt = `
+      CRITICAL: PRESERVE EXACT CAMERA ANGLE AND PERSPECTIVE.
+      Create a photorealistic, high-resolution image of a ${roomType} designed in a ${style} style.
+      ${constraintInstruction}
+      [Design Details] Palette: ${colorPalette}. Atmosphere: ${
+      prompt || "High-end interior design, soft natural lighting."
+    }
+      Return an image.
+    `;
+
+    const result = await geminiImageModel.generateContent({
+      contents: [
+        {
+          role: "user",
+          parts: [{ text: fullPrompt }, fileToGenerativePart(image)],
+        },
+      ],
+    });
     const candidates = result.response.candidates;
-
     if (!candidates || candidates.length === 0)
       throw new Error("No candidates returned");
 
     let generatedImageBase64 = null;
-
-    // Check for inline image data in the response parts
     for (const part of candidates[0].content.parts) {
       if (part.inlineData && part.inlineData.data) {
         generatedImageBase64 = part.inlineData.data;
@@ -187,15 +159,65 @@ app.post("/api/generate-design", async (req, res) => {
         image: `data:image/png;base64,${generatedImageBase64}`,
       });
     } else {
-      // Fallback/Error handling if only text is returned
-      const text = candidates[0].content.parts.map((p) => p.text).join(" ");
-      console.warn("Model returned text instead of image:", text);
-      throw new Error(
-        "The model generated text instead of an image. Please try adjusting the prompt."
-      );
+      throw new Error("Model generated text instead of image.");
     }
   } catch (error) {
     console.error("Design Generation Error:", error);
+    res.json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * Endpoint 3: Edit Design
+ */
+app.post("/api/edit-design", async (req, res) => {
+  try {
+    const { image, editPrompt, referenceImage } = req.body;
+    if (!image || !editPrompt) throw new Error("Missing image or prompt");
+
+    console.log(`Editing design: "${editPrompt}"...`);
+
+    let fullPrompt = `
+      CRITICAL: PRESERVE EXACT CAMERA ANGLE AND PERSPECTIVE.
+      Act as an expert photo editor. Edit the attached image according to: "${editPrompt}".
+      1. ONLY change what is requested.
+      2. PRESERVE the rest of the image exactly (lighting, perspective, layout).
+      3. Output a high-fidelity image.
+    `;
+
+    const parts = [{ text: fullPrompt }, fileToGenerativePart(image)];
+
+    if (referenceImage) {
+      fullPrompt +=
+        " Use the second attached image as a visual reference for the item requested.";
+      parts.push(fileToGenerativePart(referenceImage));
+    }
+
+    const result = await geminiImageModel.generateContent({
+      contents: [{ role: "user", parts }],
+    });
+    const candidates = result.response.candidates;
+    if (!candidates || candidates.length === 0)
+      throw new Error("No candidates returned");
+
+    let generatedImageBase64 = null;
+    for (const part of candidates[0].content.parts) {
+      if (part.inlineData && part.inlineData.data) {
+        generatedImageBase64 = part.inlineData.data;
+        break;
+      }
+    }
+
+    if (generatedImageBase64) {
+      res.json({
+        success: true,
+        image: `data:image/png;base64,${generatedImageBase64}`,
+      });
+    } else {
+      throw new Error("Model generated text instead of image.");
+    }
+  } catch (error) {
+    console.error("Edit Generation Error:", error);
     res.json({ success: false, error: error.message });
   }
 });
