@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { 
   LayoutDashboard, Wallet, PaintBucket, ListTodo, Calculator, 
-  Moon, Sun, Settings, UserCircle, ChevronLeft, ChevronRight 
+  Moon, Sun, Settings, UserCircle, ChevronLeft, ChevronRight,
+  ClipboardList 
 } from 'lucide-react';
 
 // Logic & Data
@@ -26,6 +27,7 @@ import BudgetTracker from './views/BudgetTracker';
 import DesignStudio from './views/DesignStudio';
 import ProjectTimeline from './views/ProjectTimeline';
 import MaterialCalculator from './views/MaterialCalculator';
+import RenovationPlanner from './views/RenovationPlanner';
 
 const App = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -41,97 +43,33 @@ const App = () => {
   const [tasks, setTasks] = useLocalStorage(INITIAL_TIMELINE, 're4b-timeline');
   const [activity, setActivity] = useLocalStorage(INITIAL_ACTIVITY, 're4b-activity');
   const [gallery, setGallery] = useLocalStorage(INITIAL_GALLERY, 're4b-gallery');
-  
-  // Dynamic Lists Persistence (Rooms & Categories)
   const [rooms, setRooms] = useLocalStorage(DEFAULT_ROOMS, 're4b-rooms-list');
   const [categories, setCategories] = useLocalStorage(DEFAULT_CATEGORIES, 're4b-categories-list');
 
-  // Apply Theme Class to Body
+  // Apply Theme Class
   useEffect(() => {
-    if (theme === 'dark') {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
+    if (theme === 'dark') document.documentElement.classList.add('dark');
+    else document.documentElement.classList.remove('dark');
   }, [theme]);
 
   const toggleTheme = () => setTheme(prev => prev === 'dark' ? 'light' : 'dark');
-
-  // Calculate Badge Notification
   const alertCount = budgetItems.filter(i => !i.paid && i.estimated > 1000).length;
 
-  // Currency Helper
-  const CURRENCIES = {
-    'USD': '$',
-    'EUR': '€',
-    'GBP': '£',
-    'CAD': 'C$',
-    'JPY': '¥'
-  };
+  const CURRENCIES = { 'USD': '$', 'EUR': '€', 'GBP': '£', 'CAD': 'C$', 'JPY': '¥' };
   const currencySymbol = CURRENCIES[currency];
 
   const renderContent = () => {
     const props = { currencySymbol }; 
-    // Props for views needing dynamic lists
     const listProps = { rooms, setRooms, categories, setCategories };
 
     switch (activeTab) {
-      case 'dashboard': 
-        return (
-          <Dashboard 
-            budgetItems={budgetItems} 
-            timeline={tasks} 
-            activity={activity} 
-            gallery={gallery} 
-            setGallery={setGallery} 
-            setActiveTab={setActiveTab} 
-            {...props} 
-          />
-        );
-      case 'budget': 
-        return (
-          <BudgetTracker 
-            items={budgetItems} 
-            setItems={setBudgetItems} 
-            {...listProps} 
-            {...props} 
-          />
-        );
-      case 'design': 
-        return (
-          <DesignStudio 
-            setGallery={setGallery} 
-            rooms={rooms}
-            setRooms={setRooms}
-            {...props} 
-          />
-        );
-      case 'timeline': 
-        return (
-          <ProjectTimeline 
-            tasks={tasks} 
-            setTasks={setTasks} 
-            {...props} 
-          />
-        );
-      case 'calculator': 
-        return (
-          <MaterialCalculator 
-            {...props} 
-          />
-        );
-      default: 
-        return (
-          <Dashboard 
-            budgetItems={budgetItems} 
-            timeline={tasks} 
-            activity={activity} 
-            gallery={gallery} 
-            setGallery={setGallery} 
-            setActiveTab={setActiveTab} 
-            {...props} 
-          />
-        );
+      case 'dashboard': return <Dashboard budgetItems={budgetItems} timeline={tasks} activity={activity} gallery={gallery} setGallery={setGallery} setActiveTab={setActiveTab} {...props} />;
+      case 'budget': return <BudgetTracker items={budgetItems} setItems={setBudgetItems} {...listProps} {...props} />;
+      case 'design': return <DesignStudio setGallery={setGallery} rooms={rooms} setRooms={setRooms} {...props} />;
+      case 'planner': return <RenovationPlanner {...props} />;
+      case 'timeline': return <ProjectTimeline tasks={tasks} setTasks={setTasks} {...props} />;
+      case 'calculator': return <MaterialCalculator {...props} />;
+      default: return <Dashboard budgetItems={budgetItems} timeline={tasks} activity={activity} gallery={gallery} setGallery={setGallery} setActiveTab={setActiveTab} {...props} />;
     }
   };
 
@@ -151,96 +89,58 @@ const App = () => {
         <Icon size={22} />
         {alert && <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full border-2 border-white dark:border-slate-900"></span>}
       </div>
-      
-      {!isSidebarCollapsed && (
-        <span className="hidden md:block truncate transition-opacity duration-300 animate-in fade-in">{label}</span>
-      )}
-
-      {/* Hover Tooltip for Collapsed State */}
-      {isSidebarCollapsed && (
-        <div className="absolute left-full ml-2 px-2 py-1 bg-slate-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
-          {label}
-        </div>
-      )}
+      {!isSidebarCollapsed && <span className="hidden md:block truncate transition-opacity duration-300 animate-in fade-in">{label}</span>}
+      {isSidebarCollapsed && <div className="absolute left-full ml-2 px-2 py-1 bg-slate-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">{label}</div>}
     </button>
   );
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col md:flex-row font-sans text-slate-900 dark:text-slate-100 transition-colors duration-300">
+    // Changed min-h-screen to h-screen and added overflow-hidden to lock viewport
+    <div className="h-screen overflow-hidden bg-slate-50 dark:bg-slate-950 flex flex-col md:flex-row font-sans text-slate-900 dark:text-slate-100 transition-colors duration-300">
       
-      {/* Sidebar (Desktop) */}
-      <aside 
-        className={`hidden md:flex flex-col bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 p-4 shrink-0 fixed h-full z-20 transition-all duration-300 ease-in-out
-          ${isSidebarCollapsed ? 'w-20' : 'w-64'}
-        `}
-      >
-        {/* Toggle Button - Moved to Bottom */}
-        <button
-          onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-          className="absolute -right-3 bottom-8 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-500 hover:text-blue-600 p-1.5 rounded-full shadow-md transition-transform hover:scale-110 active:scale-95 z-30 flex items-center justify-center group"
-        >
+      {/* Sidebar */}
+      <aside className={`hidden md:flex flex-col bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 p-4 shrink-0 fixed h-full z-20 transition-all duration-300 ease-in-out ${isSidebarCollapsed ? 'w-20' : 'w-64'}`}>
+        <button onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)} className="absolute -right-3 bottom-8 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-500 hover:text-blue-600 p-1.5 rounded-full shadow-md transition-transform hover:scale-110 active:scale-95 z-30 flex items-center justify-center group">
           {isSidebarCollapsed ? <ChevronRight size={14} className="group-hover:animate-pulse" /> : <ChevronLeft size={14} />}
         </button>
 
-        {/* Logo Area */}
         <div className={`flex items-center gap-2 px-2 mb-8 transition-all duration-300 ${isSidebarCollapsed ? 'justify-center' : ''}`}>
           <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold shadow-lg shadow-blue-600/20 shrink-0">r</div>
-          {!isSidebarCollapsed && (
-            <span className="font-bold text-xl tracking-tight text-slate-900 dark:text-white whitespace-nowrap overflow-hidden animate-in fade-in slide-in-from-left-2">re4b</span>
-          )}
+          {!isSidebarCollapsed && <span className="font-bold text-xl tracking-tight text-slate-900 dark:text-white whitespace-nowrap overflow-hidden animate-in fade-in slide-in-from-left-2">re4b</span>}
         </div>
         
-        {/* Navigation */}
         <nav className="space-y-2 flex-1">
           <NavItem id="dashboard" icon={LayoutDashboard} label="Dashboard" />
           <NavItem id="budget" icon={Wallet} label="Budget" alert={alertCount > 0} />
           <NavItem id="design" icon={PaintBucket} label="Design Studio" />
+          <NavItem id="planner" icon={ClipboardList} label="Renovation Plan" />
           <NavItem id="timeline" icon={ListTodo} label="Timeline" />
           <NavItem id="calculator" icon={Calculator} label="Calculators" />
         </nav>
 
-        {/* User Footer */}
         <div className="mt-auto space-y-4">
           <div className="px-1 py-4 border-t border-slate-100 dark:border-slate-800">
-            <button 
-              onClick={() => setIsSettingsOpen(true)}
-              className={`flex items-center gap-3 w-full text-left hover:bg-slate-50 dark:hover:bg-slate-800 p-2 rounded-lg transition-colors group ${isSidebarCollapsed ? 'justify-center' : ''}`}
-              title="User Settings"
-            >
-              <div className="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-slate-500 dark:text-slate-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors shrink-0">
-                <Settings size={16} />
-              </div>
-              {!isSidebarCollapsed && (
-                <div className="text-sm overflow-hidden">
-                  <div className="font-medium dark:text-slate-200 truncate">Demo User</div>
-                  <div className="text-slate-500 dark:text-slate-500 text-xs truncate">{currency} • Free Plan</div>
-                </div>
-              )}
+            <button onClick={() => setIsSettingsOpen(true)} className={`flex items-center gap-3 w-full text-left hover:bg-slate-50 dark:hover:bg-slate-800 p-2 rounded-lg transition-colors group ${isSidebarCollapsed ? 'justify-center' : ''}`} title="User Settings">
+              <div className="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-slate-500 dark:text-slate-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors shrink-0"><Settings size={16} /></div>
+              {!isSidebarCollapsed && <div className="text-sm overflow-hidden"><div className="font-medium dark:text-slate-200 truncate">Demo User</div><div className="text-slate-500 dark:text-slate-500 text-xs truncate">{currency} • Free Plan</div></div>}
             </button>
           </div>
         </div>
       </aside>
 
-      {/* Main Content Area */}
-      <main 
-        className={`flex-1 relative min-h-screen flex flex-col transition-all duration-300 ease-in-out
-          ${isSidebarCollapsed ? 'md:ml-20' : 'md:ml-64'}
-        `}
-      >
-        {/* Global Header */}
-        <header className="sticky top-0 z-30 flex justify-end items-center p-4 bg-slate-50/80 dark:bg-slate-950/80 backdrop-blur-sm pointer-events-none">
-           <div className="pointer-events-auto">
-             <button 
-                onClick={toggleTheme}
-                className="flex items-center gap-2 px-4 py-2 rounded-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm text-sm font-medium text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-all"
-              >
-                {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
-                <span>{theme === 'dark' ? 'Light' : 'Dark'}</span>
+      {/* Main Content Area - Changed to h-full overflow-hidden */}
+      <main className={`flex-1 h-full overflow-hidden flex flex-col transition-all duration-300 ease-in-out ${isSidebarCollapsed ? 'md:ml-20' : 'md:ml-64'}`}>
+        {/* Sticky Header */}
+        <header className="flex-shrink-0 flex justify-end items-center p-4 bg-slate-50/80 dark:bg-slate-950/80 backdrop-blur-sm z-30">
+           <div>
+             <button onClick={toggleTheme} className="flex items-center gap-2 px-4 py-2 rounded-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm text-sm font-medium text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-all">
+                {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}<span>{theme === 'dark' ? 'Light' : 'Dark'}</span>
               </button>
            </div>
         </header>
 
-        <div className="p-4 md:p-8 pt-0 overflow-y-auto flex-1">
+        {/* Scrollable Content Container */}
+        <div className="flex-1 overflow-y-auto p-4 md:p-8 pt-0">
           <div className="max-w-7xl mx-auto w-full">
             {renderContent()}
           </div>
@@ -290,24 +190,13 @@ const App = () => {
         </div>
       </Modal>
 
-      {/* Bottom Navigation (Mobile) */}
+      {/* Mobile Nav */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 flex justify-around p-4 z-50 pb-safe transition-colors duration-300">
-        <button onClick={() => setActiveTab('dashboard')} className={`${activeTab === 'dashboard' ? 'text-blue-600 dark:text-blue-400' : 'text-slate-400'}`}>
-          <LayoutDashboard size={24} />
-        </button>
-        <button onClick={() => setActiveTab('budget')} className={`${activeTab === 'budget' ? 'text-blue-600 dark:text-blue-400' : 'text-slate-400'} relative`}>
-          <Wallet size={24} />
-          {alertCount > 0 && <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full"></span>}
-        </button>
-        <button onClick={() => setIsSettingsOpen(true)} className="text-slate-400">
-          <Settings size={24} />
-        </button>
-        <button onClick={() => setActiveTab('design')} className={`${activeTab === 'design' ? 'text-blue-600 dark:text-blue-400' : 'text-slate-400'}`}>
-          <PaintBucket size={24} />
-        </button>
-        <button onClick={() => setActiveTab('timeline')} className={`${activeTab === 'timeline' ? 'text-blue-600 dark:text-blue-400' : 'text-slate-400'}`}>
-          <ListTodo size={24} />
-        </button>
+        <button onClick={() => setActiveTab('dashboard')} className={`${activeTab === 'dashboard' ? 'text-blue-600 dark:text-blue-400' : 'text-slate-400'}`}><LayoutDashboard size={24} /></button>
+        <button onClick={() => setActiveTab('budget')} className={`${activeTab === 'budget' ? 'text-blue-600 dark:text-blue-400' : 'text-slate-400'} relative`}><Wallet size={24} />{alertCount > 0 && <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full"></span>}</button>
+        <button onClick={() => setActiveTab('design')} className={`${activeTab === 'design' ? 'text-blue-600 dark:text-blue-400' : 'text-slate-400'}`}><PaintBucket size={24} /></button>
+        <button onClick={() => setActiveTab('planner')} className={`${activeTab === 'planner' ? 'text-blue-600 dark:text-blue-400' : 'text-slate-400'}`}><ClipboardList size={24} /></button>
+        <button onClick={() => setActiveTab('timeline')} className={`${activeTab === 'timeline' ? 'text-blue-600 dark:text-blue-400' : 'text-slate-400'}`}><ListTodo size={24} /></button>
       </nav>
     </div>
   );

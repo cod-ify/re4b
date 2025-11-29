@@ -15,16 +15,24 @@ app.use(express.json({ limit: "50mb" }));
 const projectId = process.env.GCLOUD_PROJECT;
 const location = process.env.GCLOUD_LOCATION || "us-central1";
 
+// Initialize Vertex AI Client
 const vertex_ai = new VertexAI({ project: projectId, location });
 
 // --- Models ---
+
+// 1. ANALYSIS MODEL: Gemini 2.5 Flash
+// Used for "seeing" the room geometry and reasoning about renovation plans.
 const geminiAnalysisModel = vertex_ai.preview.getGenerativeModel({
   model: "gemini-2.5-flash",
 });
+
+// 2. GENERATION MODEL: Gemini 2.5 Flash Image
+// Used for creating high-fidelity renders.
 const geminiImageModel = vertex_ai.preview.getGenerativeModel({
   model: "gemini-2.5-flash-image",
 });
 
+// Helper to convert base64 string to Vertex AI Part format
 const fileToGenerativePart = (base64DataUrl) => {
   const matches = base64DataUrl.match(/^data:(.+);base64,(.+)$/);
   if (!matches || matches.length < 3) throw new Error("Invalid base64 image");
@@ -49,7 +57,7 @@ app.post("/api/enhance-prompt", async (req, res) => {
     - Structure: ${maintainStructure ? "Strictly maintained" : "Flexible"}
     - Furniture: ${maintainFurniture ? "Strictly maintained" : "Flexible"}
 
-    IMPORTANT: Do NOT describe camera angles, focal lengths, or structural changes (like moving windows/doors). 
+    IMPORTANT: Do NOT describe camera angles, focal lengths, or structural changes (like moving windows/doors) unless explicitly asked. 
     Focus ONLY on lighting (e.g. "soft diffuse daylight"), materials (e.g. "velvet", "oak"), and atmosphere.
     Output ONLY the enhanced prompt.`;
 
@@ -60,12 +68,13 @@ app.post("/api/enhance-prompt", async (req, res) => {
         result.response.candidates[0].content.parts[0].text.trim(),
     });
   } catch (error) {
+    console.error("Enhance Error:", error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
 
 /**
- * Endpoint 2: Generate Design
+ * Endpoint 2: Generate Design (Design Studio)
  */
 app.post("/api/generate-design", async (req, res) => {
   try {
@@ -87,12 +96,14 @@ app.post("/api/generate-design", async (req, res) => {
     // STEP 1: ANALYSIS
     let furnitureList = "standard furniture";
     console.log("Analyzing scene geometry and furniture...");
+
     const analysisPrompt = `
       Analyze this interior image of a ${roomType}. 
       1. List the architectural geometry (window positions, ceiling height, beams, door locations).
       2. List every major piece of furniture visible (e.g. "L-shaped sofa, coffee table, arm chair").
       Do not describe colors or decor style. Only describe SHAPES and POSITIONS.
     `;
+
     const analysisReq = {
       contents: [
         {
@@ -101,6 +112,7 @@ app.post("/api/generate-design", async (req, res) => {
         },
       ],
     };
+
     const analysisResult = await geminiAnalysisModel.generateContent(
       analysisReq
     );
@@ -141,6 +153,7 @@ app.post("/api/generate-design", async (req, res) => {
         },
       ],
     });
+
     const candidates = result.response.candidates;
     if (!candidates || candidates.length === 0)
       throw new Error("No candidates returned");
@@ -168,7 +181,7 @@ app.post("/api/generate-design", async (req, res) => {
 });
 
 /**
- * Endpoint 3: Edit Design
+ * Endpoint 3: Edit Design (Post-Production)
  */
 app.post("/api/edit-design", async (req, res) => {
   try {
@@ -218,6 +231,81 @@ app.post("/api/edit-design", async (req, res) => {
     }
   } catch (error) {
     console.error("Edit Generation Error:", error);
+    res.json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * Endpoint 4: Analyze Renovation (Renovation Planner)
+ */
+app.post("/api/analyze-renovation", async (req, res) => {
+  try {
+    const { beforeImage, afterImage, currencySymbol } = req.body;
+    if (!beforeImage || !afterImage) throw new Error("Missing images");
+
+    console.log("Analyzing renovation plan...");
+
+    const prompt = `
+      Act as an expert construction manager. Compare Image A (Current) and Image B (Goal).
+      Create a detailed, step-by-step renovation plan.
+
+      1. **Analyze Risks:** Determine the DIY difficulty (Low, Medium, High). High risk includes structural changes, advanced electrical/plumbing.
+      2. **Phases:** Break the project into logical phases (e.g., Prep, Demo, Rough-in, Finish).
+      3. **Tools per Phase:** Assign specific tools to the phase where they are needed.
+      4. **Detailed Steps:** For each phase, provide granular micro-steps. 
+         - Example: Instead of "Remove Sink", say "1. Shut off water valve. 2. Disconnect P-trap. 3. Unscrew mounting clips."
+         - Include specific safety warnings for dangerous steps.
+      5. **Video Search:** Suggest 3 specific YouTube search terms to help the user learn the hardest tasks.
+
+      Output STRICTLY VALID JSON with this structure:
+      {
+        "diyRating": "Medium", // Low, Medium, High
+        "riskyPhases": ["Electrical", "Plumbing"], // List phases best left to pros if High risk
+        "phases": [
+          { 
+            "name": "Demolition", 
+            "tools": ["Basin Wrench", "Bucket", "Safety Glasses"],
+            "steps": [
+              { "action": "Shut off water supply", "detail": "Turn valves clockwise under the sink.", "warning": "Verify water is off by turning on tap." },
+              { "action": "Disconnect drain pipe", "detail": "Place bucket under P-trap to catch water." }
+            ]
+          }
+        ],
+        "materials": [
+          { "id": "m1", "name": "Laminate Flooring", "unit": "sq ft", "unitPrice": 4.50, "usage": "Floor" }
+        ],
+        "videoSearchTerms": ["how to remove vanity sink", "installing laminate flooring for beginners"]
+      }
+    `;
+
+    const request = {
+      contents: [
+        {
+          role: "user",
+          parts: [
+            { text: prompt },
+            { text: "Image A (Before):" },
+            fileToGenerativePart(beforeImage),
+            { text: "Image B (After):" },
+            fileToGenerativePart(afterImage),
+          ],
+        },
+      ],
+    };
+
+    const result = await geminiAnalysisModel.generateContent(request);
+    const responseText = result.response.candidates[0].content.parts[0].text;
+
+    // Clean JSON markdown if present
+    const jsonStr = responseText
+      .replace(/```json/g, "")
+      .replace(/```/g, "")
+      .trim();
+    const plan = JSON.parse(jsonStr);
+
+    res.json({ success: true, plan });
+  } catch (error) {
+    console.error("Renovation Analysis Error:", error);
     res.json({ success: false, error: error.message });
   }
 });
