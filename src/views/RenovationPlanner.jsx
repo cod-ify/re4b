@@ -46,13 +46,13 @@ const FormattedText = ({ text }) => {
   );
 };
 
-const RenovationPlanner = ({ currencySymbol, plans, setPlans, setBudgetItems, setTasks, setActiveTab }) => {
+const RenovationPlanner = ({ currencySymbol, plans, setPlans, setBudgetItems, setTasks, setActiveTab, inventory, setInventory }) => {
   const [beforeImage, setBeforeImage] = useState(null);
   const [afterImage, setAfterImage] = useState(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [plan, setPlan] = useState(null);
   
-  // New: Context for Measurements
+  // Context for Measurements
   const [projectContext, setProjectContext] = useState('');
 
   // Project State
@@ -64,13 +64,36 @@ const RenovationPlanner = ({ currencySymbol, plans, setPlans, setBudgetItems, se
   
   // Cost & Tools State
   const [resourceTab, setResourceTab] = useState('materials');
-  const [ownedTools, setOwnedTools] = useState({});
   const [customPrices, setCustomPrices] = useState({});
 
   const [modalConfig, setModalConfig] = useState({
     isOpen: false, title: '', message: '', primaryAction: null, primaryLabel: 'OK', secondaryLabel: 'Close', showSecondary: true
   });
   const closeModal = () => setModalConfig({ ...modalConfig, isOpen: false });
+
+  // --- Helpers for Global Inventory ---
+  const isToolOwned = (toolName) => {
+    if (!inventory) return false;
+    return inventory.some(t => t.name.toLowerCase() === toolName.toLowerCase() && t.owned);
+  };
+
+  const toggleToolOwnership = (toolName, currentPrice) => {
+    if (!inventory) return;
+    const existing = inventory.find(t => t.name.toLowerCase() === toolName.toLowerCase());
+    
+    if (existing) {
+      setInventory(inventory.map(t => t.id === existing.id ? { ...t, owned: !t.owned } : t));
+    } else {
+      const newTool = {
+        id: Date.now(),
+        name: toolName,
+        price: currentPrice || 0,
+        category: 'General',
+        owned: true
+      };
+      setInventory([...inventory, newTool]);
+    }
+  };
 
   // --- Handlers ---
   
@@ -84,7 +107,6 @@ const RenovationPlanner = ({ currencySymbol, plans, setPlans, setBudgetItems, se
       setVideoLinks(selected.videoLinks || []);
       setBeforeImage(selected.beforeImage);
       setAfterImage(selected.afterImage);
-      setOwnedTools(selected.ownedTools || {});
       setCustomPrices(selected.customPrices || {});
       setProjectContext(selected.projectContext || '');
     }
@@ -100,7 +122,6 @@ const RenovationPlanner = ({ currencySymbol, plans, setPlans, setBudgetItems, se
       videoLinks,
       beforeImage,
       afterImage,
-      ownedTools,
       customPrices,
       projectContext,
       date: new Date().toLocaleDateString()
@@ -119,15 +140,20 @@ const RenovationPlanner = ({ currencySymbol, plans, setPlans, setBudgetItems, se
 
   const handleExportToBudget = () => {
     if (!plan) return;
+    
     const materialItems = plan.materials.map((m, i) => {
       const qty = parseFloat(measurements[m.id] || 0);
       const price = customPrices[m.id] !== undefined ? customPrices[m.id] : m.unitPrice;
       return { id: Date.now() + i, name: m.name, category: 'Materials', room: projectName, estimated: qty * price, actual: 0, paid: false, paymentMethod: 'Credit Card', date: new Date().toISOString().split('T')[0], notes: `Imported: ${qty} ${m.unit}` };
     });
-    const toolItems = plan.toolsList.filter(t => !ownedTools[t.name]).map((t, i) => {
+
+    const toolItems = plan.toolsList
+      .filter(t => !isToolOwned(t.name))
+      .map((t, i) => {
         const price = customPrices[t.name] !== undefined ? customPrices[t.name] : t.price;
         return { id: Date.now() + 100 + i, name: t.name, category: 'Tools', room: projectName, estimated: price, actual: 0, paid: false, paymentMethod: 'Credit Card', date: new Date().toISOString().split('T')[0], notes: 'New Tool Required' };
-    });
+      });
+
     setBudgetItems(prev => [...materialItems, ...toolItems, ...prev]);
     setModalConfig({ isOpen: true, title: 'Budget Updated', message: `Added ${materialItems.length} materials and ${toolItems.length} tools to your Budget Tracker.`, primaryAction: () => { closeModal(); setActiveTab('budget'); }, primaryLabel: 'View Budget', secondaryLabel: 'Stay Here', showSecondary: true });
   };
@@ -161,9 +187,7 @@ const RenovationPlanner = ({ currencySymbol, plans, setPlans, setBudgetItems, se
       if (data.success) {
         setPlan(data.plan);
         const initialMeasurements = {};
-        data.plan.materials.forEach(m => {
-          initialMeasurements[m.id] = m.defaultQty || 0;
-        });
+        data.plan.materials.forEach(m => initialMeasurements[m.id] = m.defaultQty || 0);
         setMeasurements(initialMeasurements);
       }
     } catch (error) {
@@ -176,20 +200,22 @@ const RenovationPlanner = ({ currencySymbol, plans, setPlans, setBudgetItems, se
 
   const handleAddVideo = () => { if (newLink) { setVideoLinks([...videoLinks, newLink]); setNewLink(''); } };
   const handlePriceChange = (id, newPrice) => setCustomPrices(prev => ({ ...prev, [id]: parseFloat(newPrice) || 0 }));
-  const toggleToolOwnership = (toolName) => setOwnedTools(prev => ({ ...prev, [toolName]: !prev[toolName] }));
 
   const calculateTotalCost = () => {
     if (!plan) return 0;
+    
     const materialCost = plan.materials.reduce((acc, item) => {
       const qty = parseFloat(measurements[item.id] || 0);
       const price = customPrices[item.id] !== undefined ? customPrices[item.id] : item.unitPrice;
       return acc + (qty * price);
     }, 0);
+
     const toolCost = plan.toolsList.reduce((acc, tool) => {
-      if (ownedTools[tool.name]) return acc; 
+      if (isToolOwned(tool.name)) return acc; 
       const price = customPrices[tool.name] !== undefined ? customPrices[tool.name] : tool.price;
       return acc + price;
     }, 0);
+
     return materialCost + toolCost;
   };
 
@@ -214,7 +240,6 @@ const RenovationPlanner = ({ currencySymbol, plans, setPlans, setBudgetItems, se
 
   // --- Components ---
   const RiskMeter = ({ rating }) => {
-    // Adjusted widths to be compact
     const positions = { Low: '10%', Medium: '50%', High: '90%' };
     const colors = { Low: 'bg-emerald-500', Medium: 'bg-amber-500', High: 'bg-red-500' };
     const textColors = { Low: 'text-emerald-600', Medium: 'text-amber-600', High: 'text-red-600' };
@@ -268,7 +293,6 @@ const RenovationPlanner = ({ currencySymbol, plans, setPlans, setBudgetItems, se
         </Card>
       </div>
 
-      {/* Project Notes Section (Height Fixed) */}
       <Card className="p-4">
          <TextArea 
            label="Project Notes / Measurements (Optional)" 
@@ -368,11 +392,11 @@ const RenovationPlanner = ({ currencySymbol, plans, setPlans, setBudgetItems, se
                       );
                     })}
                     {resourceTab === 'tools' && plan.toolsList.map((tool, i) => {
-                      const isOwned = ownedTools[tool.name];
+                      const isOwned = isToolOwned(tool.name);
                       const currentPrice = customPrices[tool.name] !== undefined ? customPrices[tool.name] : tool.price;
                       return (
                         <div key={i} className={`flex items-center justify-between p-2 rounded-lg border transition-all ${isOwned ? 'bg-slate-50 border-slate-200 dark:bg-slate-800/50 dark:border-slate-800' : 'bg-white border-slate-200 dark:bg-slate-900 dark:border-slate-700'}`}>
-                           <div className="flex items-center gap-3"><button onClick={() => toggleToolOwnership(tool.name)} className={`transition-colors ${isOwned ? 'text-blue-600' : 'text-slate-300 hover:text-slate-400'}`}>{isOwned ? <CheckSquare size={18} /> : <Square size={18} />}</button><div><p className={`text-sm font-medium ${isOwned ? 'text-slate-400 line-through' : 'text-slate-700 dark:text-slate-200'}`}>{tool.name}</p></div></div>
+                           <div className="flex items-center gap-3"><button onClick={() => toggleToolOwnership(tool.name, currentPrice)} className={`transition-colors ${isOwned ? 'text-blue-600' : 'text-slate-300 hover:text-slate-400'}`}>{isOwned ? <CheckSquare size={18} /> : <Square size={18} />}</button><div><p className={`text-sm font-medium ${isOwned ? 'text-slate-400 line-through' : 'text-slate-700 dark:text-slate-200'}`}>{tool.name}</p></div></div>
                            <div className={`flex items-center gap-0.5 ${isOwned ? 'opacity-50' : 'opacity-100'}`}><span className="text-xs text-slate-400">{currencySymbol}</span><input type="number" className="w-12 text-right bg-transparent border-b border-transparent hover:border-slate-300 text-sm font-numbers focus:border-blue-500 focus:outline-none no-spin" value={currentPrice} onChange={(e) => handlePriceChange(tool.name, e.target.value)} disabled={isOwned} /></div>
                         </div>
                       );

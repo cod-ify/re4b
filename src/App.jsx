@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   LayoutDashboard, Wallet, PaintBucket, ListTodo, Calculator, 
   Moon, Sun, Settings, UserCircle, ChevronLeft, ChevronRight,
-  ClipboardList 
+  ClipboardList, Wrench 
 } from 'lucide-react';
 
 // Logic & Data
@@ -28,6 +28,7 @@ import DesignStudio from './views/DesignStudio';
 import ProjectTimeline from './views/ProjectTimeline';
 import MaterialCalculator from './views/MaterialCalculator';
 import RenovationPlanner from './views/RenovationPlanner';
+import Toolbox from './views/Toolbox';
 
 const App = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -45,9 +46,14 @@ const App = () => {
   const [gallery, setGallery] = useLocalStorage(INITIAL_GALLERY, 're4b-gallery');
   const [rooms, setRooms] = useLocalStorage(DEFAULT_ROOMS, 're4b-rooms-list');
   const [categories, setCategories] = useLocalStorage(DEFAULT_CATEGORIES, 're4b-categories-list');
-  
-  // NEW: Renovation Plans
   const [renovationPlans, setRenovationPlans] = useLocalStorage([], 're4b-renovation-plans');
+  
+  // Global Tool Inventory
+  const [inventory, setInventory] = useLocalStorage([
+    { id: 1, name: 'Tape Measure', price: 10, category: 'General', owned: true },
+    { id: 2, name: 'Hammer', price: 15, category: 'General', owned: true },
+    { id: 3, name: 'Safety Glasses', price: 8, category: 'Safety', owned: true },
+  ], 're4b-tool-inventory');
 
   // Apply Theme Class
   useEffect(() => {
@@ -66,29 +72,27 @@ const App = () => {
     const listProps = { rooms, setRooms, categories, setCategories };
 
     switch (activeTab) {
-      case 'dashboard': 
-        return <Dashboard budgetItems={budgetItems} timeline={tasks} activity={activity} gallery={gallery} setGallery={setGallery} setActiveTab={setActiveTab} {...props} />;
-      case 'budget': 
-        return <BudgetTracker items={budgetItems} setItems={setBudgetItems} {...listProps} {...props} />;
-      case 'design': 
-        return <DesignStudio setGallery={setGallery} rooms={rooms} setRooms={setRooms} {...props} />;
+      case 'dashboard': return <Dashboard budgetItems={budgetItems} timeline={tasks} activity={activity} gallery={gallery} setGallery={setGallery} setActiveTab={setActiveTab} {...props} />;
+      case 'budget': return <BudgetTracker items={budgetItems} setItems={setBudgetItems} {...listProps} {...props} />;
+      case 'design': return <DesignStudio setGallery={setGallery} rooms={rooms} setRooms={setRooms} {...props} />;
       case 'planner': 
         return (
           <RenovationPlanner 
             plans={renovationPlans} 
             setPlans={setRenovationPlans}
-            setBudgetItems={setBudgetItems} // Pass ability to update budget
-            setTasks={setTasks} // Pass ability to update timeline
-            setActiveTab={setActiveTab} // Allow redirection after export
+            setBudgetItems={setBudgetItems} 
+            setTasks={setTasks} 
+            setActiveTab={setActiveTab}
+            inventory={inventory}
+            setInventory={setInventory}
             {...props} 
           />
         );
-      case 'timeline': 
-        return <ProjectTimeline tasks={tasks} setTasks={setTasks} {...props} />;
-      case 'calculator': 
-        return <MaterialCalculator {...props} />;
-      default: 
-        return <Dashboard budgetItems={budgetItems} timeline={tasks} activity={activity} gallery={gallery} setGallery={setGallery} setActiveTab={setActiveTab} {...props} />;
+      case 'tools': 
+        return <Toolbox inventory={inventory} setInventory={setInventory} {...props} />;
+      case 'timeline': return <ProjectTimeline tasks={tasks} setTasks={setTasks} {...props} />;
+      case 'calculator': return <MaterialCalculator {...props} />;
+      default: return <Dashboard budgetItems={budgetItems} timeline={tasks} activity={activity} gallery={gallery} setGallery={setGallery} setActiveTab={setActiveTab} {...props} />;
     }
   };
 
@@ -132,6 +136,7 @@ const App = () => {
           <NavItem id="budget" icon={Wallet} label="Budget" alert={alertCount > 0} />
           <NavItem id="design" icon={PaintBucket} label="Design Studio" />
           <NavItem id="planner" icon={ClipboardList} label="Renovation Plan" />
+          <NavItem id="tools" icon={Wrench} label="My Toolbox" />
           <NavItem id="timeline" icon={ListTodo} label="Timeline" />
           <NavItem id="calculator" icon={Calculator} label="Calculators" />
         </nav>
@@ -156,14 +161,15 @@ const App = () => {
            </div>
         </header>
 
-        <div className="flex-1 overflow-y-auto p-4 md:p-8 pt-0">
+        {/* Scrollable Content Container - CHANGED 'overflow-y-auto' to 'overflow-y-scroll' */}
+        <div className="flex-1 overflow-y-scroll p-4 md:p-8 pt-0">
           <div className="max-w-7xl mx-auto w-full">
             {renderContent()}
           </div>
         </div>
       </main>
 
-      {/* Settings Modal (kept same) */}
+      {/* Settings Modal */}
       <Modal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} title="User Settings">
         <div className="space-y-6">
           <div className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-100 dark:border-slate-800 flex items-center gap-4">
@@ -185,16 +191,28 @@ const App = () => {
              <div className="pt-2">
                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-2">Appearance</label>
                <div className="grid grid-cols-2 gap-3">
-                 <button onClick={() => setTheme('light')} className={`p-3 rounded-xl border flex items-center justify-center gap-2 text-sm font-medium transition-all ${theme === 'light' ? 'bg-blue-50 border-blue-200 text-blue-700 ring-2 ring-blue-500/20' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}><Sun size={18} /> Light</button>
-                 <button onClick={() => setTheme('dark')} className={`p-3 rounded-xl border flex items-center justify-center gap-2 text-sm font-medium transition-all ${theme === 'dark' ? 'bg-slate-800 border-slate-700 text-white ring-2 ring-slate-600/50' : 'border-slate-200 text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800'}`}><Moon size={18} /> Dark</button>
+                 <button 
+                   onClick={() => setTheme('light')}
+                   className={`p-3 rounded-xl border flex items-center justify-center gap-2 text-sm font-medium transition-all ${theme === 'light' ? 'bg-blue-50 border-blue-200 text-blue-700 ring-2 ring-blue-500/20' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}
+                 >
+                   <Sun size={18} /> Light
+                 </button>
+                 <button 
+                   onClick={() => setTheme('dark')}
+                   className={`p-3 rounded-xl border flex items-center justify-center gap-2 text-sm font-medium transition-all ${theme === 'dark' ? 'bg-slate-800 border-slate-700 text-white ring-2 ring-slate-600/50' : 'border-slate-200 text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800'}`}
+                 >
+                   <Moon size={18} /> Dark
+                 </button>
                </div>
              </div>
           </div>
-          <div className="pt-4 border-t border-slate-100 dark:border-slate-800 flex justify-end"><Button onClick={() => setIsSettingsOpen(false)}>Done</Button></div>
+          <div className="pt-4 border-t border-slate-100 dark:border-slate-800 flex justify-end">
+             <Button onClick={() => setIsSettingsOpen(false)}>Done</Button>
+          </div>
         </div>
       </Modal>
 
-      {/* Mobile Nav */}
+      {/* Bottom Navigation */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 flex justify-around p-4 z-50 pb-safe transition-colors duration-300">
         <button onClick={() => setActiveTab('dashboard')} className={`${activeTab === 'dashboard' ? 'text-blue-600 dark:text-blue-400' : 'text-slate-400'}`}><LayoutDashboard size={24} /></button>
         <button onClick={() => setActiveTab('budget')} className={`${activeTab === 'budget' ? 'text-blue-600 dark:text-blue-400' : 'text-slate-400'} relative`}><Wallet size={24} />{alertCount > 0 && <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full"></span>}</button>
