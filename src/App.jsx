@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { LayoutDashboard, Wallet, PaintBucket, ListTodo, Calculator, Moon, Sun, Settings, UserCircle } from 'lucide-react';
+import { 
+  LayoutDashboard, Wallet, PaintBucket, ListTodo, Calculator, 
+  Moon, Sun, Settings, UserCircle, ChevronLeft, ChevronRight 
+} from 'lucide-react';
 
 // Logic & Data
 import { useLocalStorage } from './hooks/useLocalStorage';
@@ -31,6 +34,7 @@ const App = () => {
   // Theme & Settings Persistence
   const [theme, setTheme] = useLocalStorage('light', 're4b-theme');
   const [currency, setCurrency] = useLocalStorage('USD', 're4b-currency');
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useLocalStorage(false, 're4b-sidebar-collapsed');
 
   // Data Persistence
   const [budgetItems, setBudgetItems] = useLocalStorage(INITIAL_BUDGET_ITEMS, 're4b-budget');
@@ -134,17 +138,30 @@ const App = () => {
   const NavItem = ({ id, icon: Icon, label, alert }) => (
     <button
       onClick={() => setActiveTab(id)}
-      className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-all w-full ${
-        activeTab === id 
+      className={`flex items-center gap-3 px-3 py-3 rounded-lg transition-all w-full relative group
+        ${activeTab === id 
           ? 'bg-blue-50 text-blue-600 font-medium dark:bg-blue-900/20 dark:text-blue-400' 
           : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200'
-      }`}
+        }
+        ${isSidebarCollapsed ? 'justify-center' : 'justify-start'}
+      `}
+      title={isSidebarCollapsed ? label : ''}
     >
-      <div className="relative">
+      <div className="relative flex-shrink-0">
         <Icon size={22} />
-        {alert && <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full"></span>}
+        {alert && <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full border-2 border-white dark:border-slate-900"></span>}
       </div>
-      <span className="hidden md:block">{label}</span>
+      
+      {!isSidebarCollapsed && (
+        <span className="hidden md:block truncate transition-opacity duration-300 animate-in fade-in">{label}</span>
+      )}
+
+      {/* Hover Tooltip for Collapsed State */}
+      {isSidebarCollapsed && (
+        <div className="absolute left-full ml-2 px-2 py-1 bg-slate-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
+          {label}
+        </div>
+      )}
     </button>
   );
 
@@ -152,12 +169,28 @@ const App = () => {
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col md:flex-row font-sans text-slate-900 dark:text-slate-100 transition-colors duration-300">
       
       {/* Sidebar (Desktop) */}
-      <aside className="hidden md:flex flex-col w-64 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 p-4 shrink-0 fixed h-full z-10 transition-colors duration-300">
-        <div className="flex items-center gap-2 px-4 mb-8">
-          <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold shadow-lg shadow-blue-600/20">r</div>
-          <span className="font-bold text-xl tracking-tight text-slate-900 dark:text-white">re4b</span>
+      <aside 
+        className={`hidden md:flex flex-col bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 p-4 shrink-0 fixed h-full z-20 transition-all duration-300 ease-in-out
+          ${isSidebarCollapsed ? 'w-20' : 'w-64'}
+        `}
+      >
+        {/* Toggle Button - Moved to Bottom */}
+        <button
+          onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+          className="absolute -right-3 bottom-8 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-500 hover:text-blue-600 p-1.5 rounded-full shadow-md transition-transform hover:scale-110 active:scale-95 z-30 flex items-center justify-center group"
+        >
+          {isSidebarCollapsed ? <ChevronRight size={14} className="group-hover:animate-pulse" /> : <ChevronLeft size={14} />}
+        </button>
+
+        {/* Logo Area */}
+        <div className={`flex items-center gap-2 px-2 mb-8 transition-all duration-300 ${isSidebarCollapsed ? 'justify-center' : ''}`}>
+          <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center text-white font-bold shadow-lg shadow-blue-600/20 shrink-0">r</div>
+          {!isSidebarCollapsed && (
+            <span className="font-bold text-xl tracking-tight text-slate-900 dark:text-white whitespace-nowrap overflow-hidden animate-in fade-in slide-in-from-left-2">re4b</span>
+          )}
         </div>
         
+        {/* Navigation */}
         <nav className="space-y-2 flex-1">
           <NavItem id="dashboard" icon={LayoutDashboard} label="Dashboard" />
           <NavItem id="budget" icon={Wallet} label="Budget" alert={alertCount > 0} />
@@ -166,26 +199,34 @@ const App = () => {
           <NavItem id="calculator" icon={Calculator} label="Calculators" />
         </nav>
 
+        {/* User Footer */}
         <div className="mt-auto space-y-4">
-          <div className="px-4 py-4 border-t border-slate-100 dark:border-slate-800">
+          <div className="px-1 py-4 border-t border-slate-100 dark:border-slate-800">
             <button 
               onClick={() => setIsSettingsOpen(true)}
-              className="flex items-center gap-3 w-full text-left hover:bg-slate-50 dark:hover:bg-slate-800 p-2 -ml-2 rounded-lg transition-colors group"
+              className={`flex items-center gap-3 w-full text-left hover:bg-slate-50 dark:hover:bg-slate-800 p-2 rounded-lg transition-colors group ${isSidebarCollapsed ? 'justify-center' : ''}`}
+              title="User Settings"
             >
-              <div className="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-slate-500 dark:text-slate-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+              <div className="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-slate-500 dark:text-slate-400 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors shrink-0">
                 <Settings size={16} />
               </div>
-              <div className="text-sm">
-                <div className="font-medium dark:text-slate-200">User Settings</div>
-                <div className="text-slate-500 dark:text-slate-500 text-xs">{currency} • Free Plan</div>
-              </div>
+              {!isSidebarCollapsed && (
+                <div className="text-sm overflow-hidden">
+                  <div className="font-medium dark:text-slate-200 truncate">Demo User</div>
+                  <div className="text-slate-500 dark:text-slate-500 text-xs truncate">{currency} • Free Plan</div>
+                </div>
+              )}
             </button>
           </div>
         </div>
       </aside>
 
       {/* Main Content Area */}
-      <main className="flex-1 md:ml-64 relative min-h-screen flex flex-col">
+      <main 
+        className={`flex-1 relative min-h-screen flex flex-col transition-all duration-300 ease-in-out
+          ${isSidebarCollapsed ? 'md:ml-20' : 'md:ml-64'}
+        `}
+      >
         {/* Global Header */}
         <header className="sticky top-0 z-30 flex justify-end items-center p-4 bg-slate-50/80 dark:bg-slate-950/80 backdrop-blur-sm pointer-events-none">
            <div className="pointer-events-auto">
