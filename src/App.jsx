@@ -45,6 +45,9 @@ const App = () => {
   const [gallery, setGallery] = useLocalStorage(INITIAL_GALLERY, 're4b-gallery');
   const [rooms, setRooms] = useLocalStorage(DEFAULT_ROOMS, 're4b-rooms-list');
   const [categories, setCategories] = useLocalStorage(DEFAULT_CATEGORIES, 're4b-categories-list');
+  
+  // NEW: Renovation Plans
+  const [renovationPlans, setRenovationPlans] = useLocalStorage([], 're4b-renovation-plans');
 
   // Apply Theme Class
   useEffect(() => {
@@ -63,13 +66,29 @@ const App = () => {
     const listProps = { rooms, setRooms, categories, setCategories };
 
     switch (activeTab) {
-      case 'dashboard': return <Dashboard budgetItems={budgetItems} timeline={tasks} activity={activity} gallery={gallery} setGallery={setGallery} setActiveTab={setActiveTab} {...props} />;
-      case 'budget': return <BudgetTracker items={budgetItems} setItems={setBudgetItems} {...listProps} {...props} />;
-      case 'design': return <DesignStudio setGallery={setGallery} rooms={rooms} setRooms={setRooms} {...props} />;
-      case 'planner': return <RenovationPlanner {...props} />;
-      case 'timeline': return <ProjectTimeline tasks={tasks} setTasks={setTasks} {...props} />;
-      case 'calculator': return <MaterialCalculator {...props} />;
-      default: return <Dashboard budgetItems={budgetItems} timeline={tasks} activity={activity} gallery={gallery} setGallery={setGallery} setActiveTab={setActiveTab} {...props} />;
+      case 'dashboard': 
+        return <Dashboard budgetItems={budgetItems} timeline={tasks} activity={activity} gallery={gallery} setGallery={setGallery} setActiveTab={setActiveTab} {...props} />;
+      case 'budget': 
+        return <BudgetTracker items={budgetItems} setItems={setBudgetItems} {...listProps} {...props} />;
+      case 'design': 
+        return <DesignStudio setGallery={setGallery} rooms={rooms} setRooms={setRooms} {...props} />;
+      case 'planner': 
+        return (
+          <RenovationPlanner 
+            plans={renovationPlans} 
+            setPlans={setRenovationPlans}
+            setBudgetItems={setBudgetItems} // Pass ability to update budget
+            setTasks={setTasks} // Pass ability to update timeline
+            setActiveTab={setActiveTab} // Allow redirection after export
+            {...props} 
+          />
+        );
+      case 'timeline': 
+        return <ProjectTimeline tasks={tasks} setTasks={setTasks} {...props} />;
+      case 'calculator': 
+        return <MaterialCalculator {...props} />;
+      default: 
+        return <Dashboard budgetItems={budgetItems} timeline={tasks} activity={activity} gallery={gallery} setGallery={setGallery} setActiveTab={setActiveTab} {...props} />;
     }
   };
 
@@ -95,7 +114,6 @@ const App = () => {
   );
 
   return (
-    // Changed min-h-screen to h-screen and added overflow-hidden to lock viewport
     <div className="h-screen overflow-hidden bg-slate-50 dark:bg-slate-950 flex flex-col md:flex-row font-sans text-slate-900 dark:text-slate-100 transition-colors duration-300">
       
       {/* Sidebar */}
@@ -128,9 +146,8 @@ const App = () => {
         </div>
       </aside>
 
-      {/* Main Content Area - Changed to h-full overflow-hidden */}
+      {/* Main Content Area */}
       <main className={`flex-1 h-full overflow-hidden flex flex-col transition-all duration-300 ease-in-out ${isSidebarCollapsed ? 'md:ml-20' : 'md:ml-64'}`}>
-        {/* Sticky Header */}
         <header className="flex-shrink-0 flex justify-end items-center p-4 bg-slate-50/80 dark:bg-slate-950/80 backdrop-blur-sm z-30">
            <div>
              <button onClick={toggleTheme} className="flex items-center gap-2 px-4 py-2 rounded-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm text-sm font-medium text-slate-600 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-all">
@@ -139,7 +156,6 @@ const App = () => {
            </div>
         </header>
 
-        {/* Scrollable Content Container */}
         <div className="flex-1 overflow-y-auto p-4 md:p-8 pt-0">
           <div className="max-w-7xl mx-auto w-full">
             {renderContent()}
@@ -147,7 +163,7 @@ const App = () => {
         </div>
       </main>
 
-      {/* Settings Modal */}
+      {/* Settings Modal (kept same) */}
       <Modal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} title="User Settings">
         <div className="space-y-6">
           <div className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-100 dark:border-slate-800 flex items-center gap-4">
@@ -169,24 +185,12 @@ const App = () => {
              <div className="pt-2">
                <label className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-2">Appearance</label>
                <div className="grid grid-cols-2 gap-3">
-                 <button 
-                   onClick={() => setTheme('light')}
-                   className={`p-3 rounded-xl border flex items-center justify-center gap-2 text-sm font-medium transition-all ${theme === 'light' ? 'bg-blue-50 border-blue-200 text-blue-700 ring-2 ring-blue-500/20' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}
-                 >
-                   <Sun size={18} /> Light
-                 </button>
-                 <button 
-                   onClick={() => setTheme('dark')}
-                   className={`p-3 rounded-xl border flex items-center justify-center gap-2 text-sm font-medium transition-all ${theme === 'dark' ? 'bg-slate-800 border-slate-700 text-white ring-2 ring-slate-600/50' : 'border-slate-200 text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800'}`}
-                 >
-                   <Moon size={18} /> Dark
-                 </button>
+                 <button onClick={() => setTheme('light')} className={`p-3 rounded-xl border flex items-center justify-center gap-2 text-sm font-medium transition-all ${theme === 'light' ? 'bg-blue-50 border-blue-200 text-blue-700 ring-2 ring-blue-500/20' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}`}><Sun size={18} /> Light</button>
+                 <button onClick={() => setTheme('dark')} className={`p-3 rounded-xl border flex items-center justify-center gap-2 text-sm font-medium transition-all ${theme === 'dark' ? 'bg-slate-800 border-slate-700 text-white ring-2 ring-slate-600/50' : 'border-slate-200 text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800'}`}><Moon size={18} /> Dark</button>
                </div>
              </div>
           </div>
-          <div className="pt-4 border-t border-slate-100 dark:border-slate-800 flex justify-end">
-             <Button onClick={() => setIsSettingsOpen(false)}>Done</Button>
-          </div>
+          <div className="pt-4 border-t border-slate-100 dark:border-slate-800 flex justify-end"><Button onClick={() => setIsSettingsOpen(false)}>Done</Button></div>
         </div>
       </Modal>
 

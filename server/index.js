@@ -21,13 +21,13 @@ const vertex_ai = new VertexAI({ project: projectId, location });
 // --- Models ---
 
 // 1. ANALYSIS MODEL: Gemini 2.5 Flash
-// Used for "seeing" the room geometry and reasoning about renovation plans.
+// Used for "seeing" the room geometry, reasoning, and text generation.
 const geminiAnalysisModel = vertex_ai.preview.getGenerativeModel({
   model: "gemini-2.5-flash",
 });
 
 // 2. GENERATION MODEL: Gemini 2.5 Flash Image
-// Used for creating high-fidelity renders.
+// Used strictly for creating high-fidelity renders.
 const geminiImageModel = vertex_ai.preview.getGenerativeModel({
   model: "gemini-2.5-flash-image",
 });
@@ -40,7 +40,7 @@ const fileToGenerativePart = (base64DataUrl) => {
 };
 
 /**
- * Endpoint 1: Magic Prompt Enhancer
+ * Endpoint 1: Get Suggestions (Magic Prompt)
  */
 app.post("/api/enhance-prompt", async (req, res) => {
   try {
@@ -48,7 +48,7 @@ app.post("/api/enhance-prompt", async (req, res) => {
       req.body;
     const chat = geminiAnalysisModel.startChat({});
 
-    // STRICT System Instruction to prevent hallucinated camera angles
+    // STRICT System Instruction to prevent hallucinated camera angles or structural changes
     const input = `You are an expert interior design photographer. Convert this user request into a precise prompt for an AI image generator.
     
     User Request: "${prompt}"
@@ -74,7 +74,7 @@ app.post("/api/enhance-prompt", async (req, res) => {
 });
 
 /**
- * Endpoint 2: Generate Design (Design Studio)
+ * Endpoint 2: Generate Design (The Grounding Pipeline)
  */
 app.post("/api/generate-design", async (req, res) => {
   try {
@@ -93,7 +93,7 @@ app.post("/api/generate-design", async (req, res) => {
       `Processing: ${roomType} in ${style} style (Structure: ${maintainStructure}, Furniture: ${maintainFurniture})...`
     );
 
-    // STEP 1: ANALYSIS
+    // STEP 1: ANALYSIS (Grounding)
     let furnitureList = "standard furniture";
     console.log("Analyzing scene geometry and furniture...");
 
@@ -126,12 +126,16 @@ app.post("/api/generate-design", async (req, res) => {
     let constraintInstruction = "";
 
     if (maintainStructure && maintainFurniture) {
+      // Lock Everything: "Reskin"
       constraintInstruction = `CRITICAL: PRESERVE EVERYTHING. Keep architecture and furniture exactly as described: "${furnitureList}". Do not move objects. Only update materials/colors.`;
     } else if (maintainStructure && !maintainFurniture) {
+      // Lock Structure, Unlock Furniture: "Refurnish"
       constraintInstruction = `CRITICAL: PRESERVE ARCHITECTURE ONLY. Keep walls/windows as described: "${furnitureList}". HOWEVER, REMOVE AND REPLACE ALL FURNITURE. The room currently contains: ${furnitureList}. Ignore these shapes. Furnish the room from scratch with new ${style} furniture.`;
     } else if (!maintainStructure && maintainFurniture) {
+      // Unlock Structure, Lock Furniture: "Renovate Shell"
       constraintInstruction = `CRITICAL: PRESERVE FURNITURE LAYOUT. Keep furniture placement: "${furnitureList}". You may redesign the walls/windows.`;
     } else {
+      // Unlock Everything: "Reimagine"
       constraintInstruction = `CREATIVE FREEDOM: Reimagine the entire room layout and architecture.`;
     }
 
@@ -235,46 +239,67 @@ app.post("/api/edit-design", async (req, res) => {
   }
 });
 
+// ... existing imports ... (Keep previous code for index.js)
+
+// ... existing endpoints 1, 2, 3 ...
+
 /**
- * Endpoint 4: Analyze Renovation (Renovation Planner)
+ * Endpoint 4: Analyze Renovation (Smart Context Aware)
  */
 app.post("/api/analyze-renovation", async (req, res) => {
   try {
-    const { beforeImage, afterImage, currencySymbol } = req.body;
+    const { beforeImage, afterImage, currencySymbol, userNotes } = req.body;
     if (!beforeImage || !afterImage) throw new Error("Missing images");
 
-    console.log("Analyzing renovation plan...");
+    console.log("Analyzing renovation plan with smart context...");
+
+    // Add user notes to prompt if available
+    const contextInstruction = userNotes
+      ? `USER PROVIDED CONTEXT: "${userNotes}". Use this to calculate quantities (e.g. if user says "12x12 room", calculate 144 sq ft for flooring).`
+      : "";
 
     const prompt = `
-      Act as an expert construction manager. Compare Image A (Current) and Image B (Goal).
-      Create a detailed, step-by-step renovation plan.
+      Act as an expert construction estimator and safety inspector. Compare Image A (Current) and Image B (Goal).
+      ${contextInstruction}
+      
+      1. **Safety & Risk:** Determine DIY difficulty (Low/Medium/High).
+         - High Risk = Electrical, Plumbing, Structural.
+      2. **Phases:** Break down the project (e.g. Prep, Demo, Install, Finish).
+      3. **Tools with Prices:** List all required tools. Provide an estimated price for each in ${currencySymbol}.
+      4. **Smart Materials:** - Identify materials.
+         - If item is COUNTABLE (e.g. 2 lamps), set 'defaultQty' to that number.
+         - If item is DIMENSIONAL (e.g. paint), set 'defaultQty' to 0 UNLESS you can calculate it from the USER PROVIDED CONTEXT.
+      5. **Measurement Guide:** Provide simple tips. 
+         - Use plain English: "Measure straight line from corner to corner". 
+         - DO NOT use math jargon like "perimeter", "circumference".
+         - Use **bold** asterisks for the item name.
 
-      1. **Analyze Risks:** Determine the DIY difficulty (Low, Medium, High). High risk includes structural changes, advanced electrical/plumbing.
-      2. **Phases:** Break the project into logical phases (e.g., Prep, Demo, Rough-in, Finish).
-      3. **Tools per Phase:** Assign specific tools to the phase where they are needed.
-      4. **Detailed Steps:** For each phase, provide granular micro-steps. 
-         - Example: Instead of "Remove Sink", say "1. Shut off water valve. 2. Disconnect P-trap. 3. Unscrew mounting clips."
-         - Include specific safety warnings for dangerous steps.
-      5. **Video Search:** Suggest 3 specific YouTube search terms to help the user learn the hardest tasks.
-
-      Output STRICTLY VALID JSON with this structure:
+      Output STRICTLY VALID JSON:
       {
-        "diyRating": "Medium", // Low, Medium, High
-        "riskyPhases": ["Electrical", "Plumbing"], // List phases best left to pros if High risk
+        "diyRating": "Medium",
+        "riskyPhases": ["Electrical"],
         "phases": [
           { 
-            "name": "Demolition", 
-            "tools": ["Basin Wrench", "Bucket", "Safety Glasses"],
+            "name": "Preparation", 
+            "tools": ["Tape Measure", "Mask"],
             "steps": [
-              { "action": "Shut off water supply", "detail": "Turn valves clockwise under the sink.", "warning": "Verify water is off by turning on tap." },
-              { "action": "Disconnect drain pipe", "detail": "Place bucket under P-trap to catch water." }
+              { "action": "Clear room", "detail": "Remove furniture.", "warning": "Lift with legs." }
             ]
           }
         ],
-        "materials": [
-          { "id": "m1", "name": "Laminate Flooring", "unit": "sq ft", "unitPrice": 4.50, "usage": "Floor" }
+        "toolsList": [
+           { "name": "Tape Measure", "price": 10 },
+           { "name": "Paint Roller", "price": 15 }
         ],
-        "videoSearchTerms": ["how to remove vanity sink", "installing laminate flooring for beginners"]
+        "materials": [
+          { "id": "m1", "name": "Sofa", "unit": "pc", "unitPrice": 500, "defaultQty": 1, "usage": "Furniture" },
+          { "id": "m2", "name": "Wall Paint", "unit": "gal", "unitPrice": 45, "defaultQty": 0, "usage": "Walls" }
+        ],
+        "measurementGuide": [
+          "**For Paint**: Measure the wall length from corner to corner. Multiply by wall height.",
+          "**For Flooring**: Measure the floor length and width in a straight line."
+        ],
+        "videoSearchTerms": ["how to paint a room"]
       }
     `;
 
@@ -295,8 +320,6 @@ app.post("/api/analyze-renovation", async (req, res) => {
 
     const result = await geminiAnalysisModel.generateContent(request);
     const responseText = result.response.candidates[0].content.parts[0].text;
-
-    // Clean JSON markdown if present
     const jsonStr = responseText
       .replace(/```json/g, "")
       .replace(/```/g, "")
