@@ -10,18 +10,7 @@ import Card from '../components/Card';
 import Button from '../components/Button';
 import Modal from '../components/Modal';
 import { Input, Select, TextArea } from '../components/FormElements';
-
-// --- Styles for removing number input arrows ---
-const styleTag = `
-  .no-spin::-webkit-inner-spin-button, 
-  .no-spin::-webkit-outer-spin-button { 
-    -webkit-appearance: none; 
-    margin: 0; 
-  }
-  .no-spin { 
-    -moz-appearance: textfield; 
-  }
-`;
+import API_BASE_URL from '../config'; // Import Config
 
 // --- Static Guides for Common Materials ---
 const STATIC_MEASUREMENT_GUIDES = {
@@ -178,7 +167,7 @@ const RenovationPlanner = ({ currencySymbol, plans, setPlans, setBudgetItems, se
     if (!beforeImage || !afterImage) return;
     setIsAnalyzing(true);
     try {
-      const response = await fetch('http://localhost:3001/api/analyze-renovation', {
+      const response = await fetch(`${API_BASE_URL}/api/analyze-renovation`, { // Updated URL
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ beforeImage, afterImage, currencySymbol, userNotes: projectContext })
@@ -260,8 +249,6 @@ const RenovationPlanner = ({ currencySymbol, plans, setPlans, setBudgetItems, se
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500 pb-20">
-      <style>{styleTag}</style>
-      
       <Modal isOpen={modalConfig.isOpen} onClose={closeModal} title={modalConfig.title}>
         <div className="space-y-6">
           <div className="flex items-start gap-4">
@@ -294,13 +281,7 @@ const RenovationPlanner = ({ currencySymbol, plans, setPlans, setBudgetItems, se
       </div>
 
       <Card className="p-4">
-         <TextArea 
-           label="Project Notes / Measurements (Optional)" 
-           placeholder="e.g. 'The room is 12x14 ft', 'Ceiling is 9ft high', 'I already have paint'."
-           value={projectContext}
-           onChange={(e) => setProjectContext(e.target.value)}
-           className="h-32 min-h-[8rem]" 
-         />
+         <TextArea label="Project Notes / Measurements (Optional)" placeholder="e.g. 'The room is 12x14 ft', 'Ceiling is 9ft high', 'I already have paint'." value={projectContext} onChange={(e) => setProjectContext(e.target.value)} className="h-32 min-h-32" />
       </Card>
 
       {!plan && (

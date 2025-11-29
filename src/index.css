@@ -1,6 +1,4 @@
 @import "tailwindcss";
-
-/* 1. Import Open Sans */
 @import url("https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&display=swap");
 
 :root {
@@ -8,15 +6,10 @@
   line-height: 1.5;
   font-weight: 400;
   color-scheme: light;
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
   background-color: #f8fafc;
   color: #0f172a;
 }
 
-/* User's custom dark variant */
 @custom-variant dark (&:where(.dark, .dark *));
 
 html,
@@ -33,10 +26,10 @@ body {
   flex-direction: column;
 }
 
-/* 2. Numeric Font Utility */
+/* Utility for tabular numbers (prices, dates) */
 .font-numbers {
   font-family: "Open Sans", sans-serif;
-  font-feature-settings: "tnum"; /* Tabular numbers for alignment */
+  font-feature-settings: "tnum";
   letter-spacing: -0.01em;
 }
 
@@ -45,7 +38,7 @@ body {
   color: #f8fafc;
 }
 
-/* Custom Scrollbar for Dropdowns */
+/* Custom Scrollbar */
 .custom-scrollbar::-webkit-scrollbar {
   width: 6px;
 }
@@ -58,4 +51,14 @@ body {
 }
 .dark .custom-scrollbar::-webkit-scrollbar-thumb {
   background-color: #334155;
+}
+
+/* Global: Remove Number Input Arrows (Spinners) */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  -moz-appearance: textfield;
 }

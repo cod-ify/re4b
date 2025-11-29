@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import Button from '../components/Button';
 import { Input } from '../components/FormElements';
+import API_BASE_URL from '../config'; // Import Config
 
 // --- UI Components ---
 
@@ -186,9 +187,9 @@ const DesignStudio = ({ setGallery, rooms, setRooms }) => {
 
   const handleGetSuggestions = async () => {
     setIsEnhancing(true);
-    setSuggestion(null); // Clear previous
+    setSuggestion(null); 
     try {
-      const response = await fetch('http://localhost:3001/api/enhance-prompt', {
+      const response = await fetch(`${API_BASE_URL}/api/enhance-prompt`, { // Updated URL
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ prompt: config.prompt, style: config.style, roomType: config.roomType, maintainStructure, maintainFurniture })
@@ -207,12 +208,9 @@ const DesignStudio = ({ setGallery, rooms, setRooms }) => {
 
   const handleAcceptSuggestion = () => {
     if (suggestion) {
-      // 1. Update the prompt
       const newConfig = { ...config, prompt: suggestion };
       setConfig(newConfig);
       setSuggestion(null);
-      
-      // 2. Trigger generation immediately
       handleGenerate(newConfig); 
     }
   };
@@ -222,16 +220,14 @@ const DesignStudio = ({ setGallery, rooms, setRooms }) => {
     setIsGenerating(true);
     setGeneratedImage(null);
     
-    // Explicitly using the config passed in (handling the immediate "Accept" case)
     const activeConfig = currentConfig; 
-
     const steps = ["Analyzing geometry...", "Locking camera angle...", "Generating new design...", "Finalizing render..."];
     let stepIndex = 0;
     setProcessingStep(steps[0]);
     const interval = setInterval(() => { stepIndex++; if (stepIndex < steps.length) setProcessingStep(steps[stepIndex]); }, 1500);
 
     try {
-      const response = await fetch('http://localhost:3001/api/generate-design', {
+      const response = await fetch(`${API_BASE_URL}/api/generate-design`, { // Updated URL
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ image: selectedImage, maintainStructure, maintainFurniture, ...activeConfig })
@@ -261,7 +257,7 @@ const DesignStudio = ({ setGallery, rooms, setRooms }) => {
     const interval = setInterval(() => { stepIndex++; if (stepIndex < steps.length) setProcessingStep(steps[stepIndex]); }, 1500);
 
     try {
-      const response = await fetch('http://localhost:3001/api/edit-design', {
+      const response = await fetch(`${API_BASE_URL}/api/edit-design`, { // Updated URL
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ image: generatedImage, editPrompt, referenceImage: editRefImage })
@@ -316,7 +312,7 @@ const DesignStudio = ({ setGallery, rooms, setRooms }) => {
       </div>
 
       <div className="flex flex-col lg:flex-row gap-6 relative">
-        <div className={`flex-shrink-0 flex flex-col gap-4 transition-all duration-700 ease-[cubic-bezier(0.4,0,0.2,1)] overflow-hidden ${isSidebarOpen ? 'lg:w-[380px] opacity-100 translate-x-0' : 'lg:w-0 opacity-0 -translate-x-10 pointer-events-none h-0 lg:h-auto'}`}>
+        <div className={`shrink-0 flex flex-col gap-4 transition-all duration-700 ease-in-out overflow-hidden ${isSidebarOpen ? 'lg:w-[380px] opacity-100 translate-x-0' : 'lg:w-0 opacity-0 -translate-x-10 pointer-events-none h-0 lg:h-auto'}`}>
           
           {generatedImage && (
              <AccordionSection id="edit" title="Post-Production" icon={Edit3} isActive={activeAccordion === 'edit'} onToggle={handleAccordionToggle}>
@@ -406,8 +402,8 @@ const DesignStudio = ({ setGallery, rooms, setRooms }) => {
           </AccordionSection>
 
           <AccordionSection id="style" title="Design Style" icon={Sliders} isActive={activeAccordion === 'style'} onToggle={handleAccordionToggle}>
-             <div className="grid grid-cols-2 gap-2 max-h-[300px] overflow-y-auto custom-scrollbar pr-1">{styles.map(style => (<div key={style.id} onClick={() => setConfig({ ...config, style: style.name })} className={`relative rounded-lg overflow-hidden cursor-pointer group border-2 transition-all duration-300 ${config.style === style.name ? 'border-blue-600 dark:border-blue-400 ring-2 ring-blue-100 dark:ring-blue-900/30' : 'border-transparent'}`}><div className="aspect-[4/3]"><img src={style.image} alt={style.name} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" /><div className={`absolute inset-0 flex items-end p-2 transition-colors duration-300 ${config.style === style.name ? 'bg-black/20' : 'bg-black/40 group-hover:bg-black/30'}`}><span className="text-white font-bold text-xs shadow-sm">{style.name}</span>{config.style === style.name && <div className="absolute top-1 right-1 bg-blue-600 text-white p-0.5 rounded-full"><Check size={10} /></div>}</div></div></div>))}
-                {isAddingStyle ? (<div className="rounded-lg border-2 border-dashed border-blue-300 dark:border-blue-700 bg-blue-50 dark:bg-blue-900/10 p-2 flex flex-col justify-center gap-2 aspect-[4/3]"><input autoFocus placeholder="Name" className="w-full p-1 text-xs rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none" value={newStyleName} onChange={e => setNewStyleName(e.target.value)} /><div className="flex gap-1"><button onClick={handleAddStyle} className="flex-1 bg-blue-600 text-white rounded py-1 text-[10px] font-bold hover:bg-blue-700">Add</button><button onClick={() => setIsAddingStyle(false)} className="flex-1 bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded py-1 text-[10px] font-bold hover:bg-slate-300">X</button></div></div>) : (<button onClick={() => setIsAddingStyle(true)} className="flex flex-col items-center justify-center gap-1 aspect-[4/3] rounded-lg border-2 border-dashed border-slate-200 dark:border-slate-700 hover:border-blue-400 dark:hover:border-blue-500 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all text-slate-400 dark:text-slate-500 hover:text-blue-600 dark:hover:text-blue-400"><Plus size={18} /><span className="text-[10px] font-bold">Custom</span></button>)}</div>
+             <div className="grid grid-cols-2 gap-2 max-h-[300px] overflow-y-auto custom-scrollbar pr-1">{styles.map(style => (<div key={style.id} onClick={() => setConfig({ ...config, style: style.name })} className={`relative rounded-lg overflow-hidden cursor-pointer group border-2 transition-all duration-300 ${config.style === style.name ? 'border-blue-600 dark:border-blue-400 ring-2 ring-blue-100 dark:ring-blue-900/30' : 'border-transparent'}`}><div className="aspect-4/3"><img src={style.image} alt={style.name} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" /><div className={`absolute inset-0 flex items-end p-2 transition-colors duration-300 ${config.style === style.name ? 'bg-black/20' : 'bg-black/40 group-hover:bg-black/30'}`}><span className="text-white font-bold text-xs shadow-sm">{style.name}</span>{config.style === style.name && <div className="absolute top-1 right-1 bg-blue-600 text-white p-0.5 rounded-full"><Check size={10} /></div>}</div></div></div>))}
+                {isAddingStyle ? (<div className="rounded-lg border-2 border-dashed border-blue-300 dark:border-blue-700 bg-blue-50 dark:bg-blue-900/10 p-2 flex flex-col justify-center gap-2 aspect-4/3"><input autoFocus placeholder="Name" className="w-full p-1 text-xs rounded border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none" value={newStyleName} onChange={e => setNewStyleName(e.target.value)} /><div className="flex gap-1"><button onClick={handleAddStyle} className="flex-1 bg-blue-600 text-white rounded py-1 text-[10px] font-bold hover:bg-blue-700">Add</button><button onClick={() => setIsAddingStyle(false)} className="flex-1 bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded py-1 text-[10px] font-bold hover:bg-slate-300">X</button></div></div>) : (<button onClick={() => setIsAddingStyle(true)} className="flex flex-col items-center justify-center gap-1 aspect-4/3 rounded-lg border-2 border-dashed border-slate-200 dark:border-slate-700 hover:border-blue-400 dark:hover:border-blue-500 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all text-slate-400 dark:text-slate-500 hover:text-blue-600 dark:hover:text-blue-400"><Plus size={18} /><span className="text-[10px] font-bold">Custom</span></button>)}</div>
           </AccordionSection>
 
           <Button variant="primary" className="w-full py-4 shadow-xl shadow-blue-500/20 text-lg font-bold" disabled={!selectedImage || isGenerating || isEditing} onClick={() => handleGenerate()}>{isGenerating ? 'Processing...' : 'Generate Design'}</Button>

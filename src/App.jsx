@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   LayoutDashboard, Wallet, PaintBucket, ListTodo, Calculator, 
   Moon, Sun, Settings, UserCircle, ChevronLeft, ChevronRight,
-  ClipboardList, Wrench 
+  ClipboardList, Wrench, Trash2, AlertTriangle
 } from 'lucide-react';
 
 // Logic & Data
@@ -49,11 +49,7 @@ const App = () => {
   const [renovationPlans, setRenovationPlans] = useLocalStorage([], 're4b-renovation-plans');
   
   // Global Tool Inventory
-  const [inventory, setInventory] = useLocalStorage([
-    { id: 1, name: 'Tape Measure', price: 10, category: 'General', owned: true },
-    { id: 2, name: 'Hammer', price: 15, category: 'General', owned: true },
-    { id: 3, name: 'Safety Glasses', price: 8, category: 'Safety', owned: true },
-  ], 're4b-tool-inventory');
+  const [inventory, setInventory] = useLocalStorage([], 're4b-tool-inventory');
 
   // Apply Theme Class
   useEffect(() => {
@@ -67,31 +63,26 @@ const App = () => {
   const CURRENCIES = { 'USD': '$', 'EUR': '€', 'GBP': '£', 'CAD': 'C$', 'JPY': '¥' };
   const currencySymbol = CURRENCIES[currency];
 
+  // --- Reset Data Handler ---
+  const handleResetData = () => {
+    if (window.confirm("Are you sure? This will delete ALL your saved projects, budget, and settings. This cannot be undone.")) {
+      localStorage.clear();
+      window.location.reload();
+    }
+  };
+
   const renderContent = () => {
     const props = { currencySymbol }; 
     const listProps = { rooms, setRooms, categories, setCategories };
 
     switch (activeTab) {
-      case 'dashboard': return <Dashboard budgetItems={budgetItems} timeline={tasks} activity={activity} gallery={gallery} setGallery={setGallery} setActiveTab={setActiveTab} {...props} />;
+      case 'dashboard': return <Dashboard budgetItems={budgetItems} timeline={tasks} activity={activity} gallery={gallery} setGallery={setGallery} renovationPlans={renovationPlans} inventory={inventory} setActiveTab={setActiveTab} {...props} />;
       case 'budget': return <BudgetTracker items={budgetItems} setItems={setBudgetItems} {...listProps} {...props} />;
       case 'design': return <DesignStudio setGallery={setGallery} rooms={rooms} setRooms={setRooms} {...props} />;
-      case 'planner': 
-        return (
-          <RenovationPlanner 
-            plans={renovationPlans} 
-            setPlans={setRenovationPlans}
-            setBudgetItems={setBudgetItems} 
-            setTasks={setTasks} 
-            setActiveTab={setActiveTab}
-            inventory={inventory}
-            setInventory={setInventory}
-            {...props} 
-          />
-        );
-      case 'tools': 
-        return <Toolbox inventory={inventory} setInventory={setInventory} {...props} />;
+      case 'planner': return <RenovationPlanner plans={renovationPlans} setPlans={setRenovationPlans} setBudgetItems={setBudgetItems} setTasks={setTasks} setActiveTab={setActiveTab} inventory={inventory} setInventory={setInventory} {...props} />;
+      case 'tools': return <Toolbox inventory={inventory} setInventory={setInventory} {...props} />;
       case 'timeline': return <ProjectTimeline tasks={tasks} setTasks={setTasks} {...props} />;
-      case 'calculator': return <MaterialCalculator {...props} />;
+      case 'calculator': return <MaterialCalculator setBudgetItems={setBudgetItems} {...props} />;
       default: return <Dashboard budgetItems={budgetItems} timeline={tasks} activity={activity} gallery={gallery} setGallery={setGallery} setActiveTab={setActiveTab} {...props} />;
     }
   };
@@ -108,7 +99,7 @@ const App = () => {
       `}
       title={isSidebarCollapsed ? label : ''}
     >
-      <div className="relative flex-shrink-0">
+      <div className="relative shrink-0">
         <Icon size={22} />
         {alert && <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full border-2 border-white dark:border-slate-900"></span>}
       </div>
@@ -161,7 +152,6 @@ const App = () => {
            </div>
         </header>
 
-        {/* Scrollable Content Container - CHANGED 'overflow-y-auto' to 'overflow-y-scroll' */}
         <div className="flex-1 overflow-y-scroll p-4 md:p-8 pt-0">
           <div className="max-w-7xl mx-auto w-full">
             {renderContent()}
@@ -205,6 +195,19 @@ const App = () => {
                  </button>
                </div>
              </div>
+
+             {/* Danger Zone: Reset Data */}
+             <div className="pt-4 mt-2 border-t border-slate-100 dark:border-slate-800">
+               <label className="block text-xs font-bold text-red-500 uppercase tracking-wide mb-2 flex items-center gap-1">
+                 <AlertTriangle size={12} /> Danger Zone
+               </label>
+               <button 
+                 onClick={handleResetData}
+                 className="w-full p-3 rounded-xl border border-red-200 bg-red-50 text-red-600 text-sm font-bold hover:bg-red-100 transition-colors dark:bg-red-900/20 dark:border-red-900/50 dark:text-red-400 dark:hover:bg-red-900/30"
+               >
+                 Reset All App Data
+               </button>
+             </div>
           </div>
           <div className="pt-4 border-t border-slate-100 dark:border-slate-800 flex justify-end">
              <Button onClick={() => setIsSettingsOpen(false)}>Done</Button>
@@ -212,13 +215,13 @@ const App = () => {
         </div>
       </Modal>
 
-      {/* Bottom Navigation */}
+      {/* Mobile Nav */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 flex justify-around p-4 z-50 pb-safe transition-colors duration-300">
         <button onClick={() => setActiveTab('dashboard')} className={`${activeTab === 'dashboard' ? 'text-blue-600 dark:text-blue-400' : 'text-slate-400'}`}><LayoutDashboard size={24} /></button>
         <button onClick={() => setActiveTab('budget')} className={`${activeTab === 'budget' ? 'text-blue-600 dark:text-blue-400' : 'text-slate-400'} relative`}><Wallet size={24} />{alertCount > 0 && <span className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full"></span>}</button>
         <button onClick={() => setActiveTab('design')} className={`${activeTab === 'design' ? 'text-blue-600 dark:text-blue-400' : 'text-slate-400'}`}><PaintBucket size={24} /></button>
         <button onClick={() => setActiveTab('planner')} className={`${activeTab === 'planner' ? 'text-blue-600 dark:text-blue-400' : 'text-slate-400'}`}><ClipboardList size={24} /></button>
-        <button onClick={() => setActiveTab('timeline')} className={`${activeTab === 'timeline' ? 'text-blue-600 dark:text-blue-400' : 'text-slate-400'}`}><ListTodo size={24} /></button>
+        <button onClick={() => setActiveTab('tools')} className={`${activeTab === 'tools' ? 'text-blue-600 dark:text-blue-400' : 'text-slate-400'}`}><Wrench size={24} /></button>
       </nav>
     </div>
   );
