@@ -76,8 +76,9 @@ export const Select = ({ label, options, value, onChange, className = "" }) => {
           />
         </button>
 
+        {/* Increased z-index to 50 to float above other cards */}
         {isOpen && (
-          <div className="absolute z-50 w-full mt-2 bg-white dark:bg-slate-900 rounded-xl border border-slate-100 dark:border-slate-800 shadow-xl overflow-hidden animate-in fade-in zoom-in-95 duration-100 origin-top">
+          <div className="absolute z-[100] w-full mt-2 bg-white dark:bg-slate-900 rounded-xl border border-slate-100 dark:border-slate-800 shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-100 origin-top">
             <div className="max-h-60 overflow-y-auto p-1.5 space-y-0.5 custom-scrollbar">
               {options.map((option) => {
                 const isSelected = option === value;
@@ -107,8 +108,6 @@ export const Select = ({ label, options, value, onChange, className = "" }) => {
 export const DatePicker = ({ label, value, onChange, className = "" }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [viewDate, setViewDate] = useState(new Date()); 
-  
-  // States for internal custom dropdowns
   const [showMonthList, setShowMonthList] = useState(false);
   const [showYearList, setShowYearList] = useState(false);
 
@@ -217,13 +216,10 @@ export const DatePicker = ({ label, value, onChange, className = "" }) => {
         </button>
 
         {isOpen && (
-          <div className="absolute z-50 mt-2 p-4 bg-white dark:bg-slate-900 rounded-xl border border-slate-100 dark:border-slate-800 shadow-xl overflow-visible animate-in fade-in zoom-in-95 duration-100 origin-top min-w-[280px]">
+          <div className="absolute z-[100] mt-2 p-4 bg-white dark:bg-slate-900 rounded-xl border border-slate-100 dark:border-slate-800 shadow-2xl overflow-visible animate-in fade-in zoom-in-95 duration-100 origin-top min-w-[280px]">
             
-            {/* Header with Custom Dropdowns */}
             <div className="flex justify-between items-center mb-4 gap-2 relative">
               <div className="flex gap-1 items-center relative z-10">
-                
-                {/* Month Selector */}
                 <div className="relative">
                   <button 
                     type="button"
@@ -232,8 +228,6 @@ export const DatePicker = ({ label, value, onChange, className = "" }) => {
                   >
                     {monthNames[viewDate.getMonth()]} <ChevronDown size={14} className="text-slate-400" />
                   </button>
-                  
-                  {/* Custom Month Dropdown */}
                   {showMonthList && (
                     <div className="absolute top-full left-0 mt-1 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-xl shadow-xl max-h-48 overflow-y-auto w-32 custom-scrollbar animate-in fade-in zoom-in-95 duration-100">
                       {monthNames.map((m, i) => (
@@ -248,8 +242,6 @@ export const DatePicker = ({ label, value, onChange, className = "" }) => {
                     </div>
                   )}
                 </div>
-                
-                {/* Year Selector */}
                 <div className="relative">
                   <button 
                     type="button"
@@ -258,8 +250,6 @@ export const DatePicker = ({ label, value, onChange, className = "" }) => {
                   >
                     {viewDate.getFullYear()} <ChevronDown size={14} className="text-slate-400" />
                   </button>
-
-                  {/* Custom Year Dropdown */}
                   {showYearList && (
                     <div className="absolute top-full left-0 mt-1 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-xl shadow-xl max-h-48 overflow-y-auto w-24 custom-scrollbar animate-in fade-in zoom-in-95 duration-100">
                       {years.map((y) => (
@@ -275,38 +265,18 @@ export const DatePicker = ({ label, value, onChange, className = "" }) => {
                   )}
                 </div>
               </div>
-
               <div className="flex gap-1">
-                <button type="button" onClick={() => changeMonth(-1)} className="p-1 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400">
-                  <ChevronLeft size={16} />
-                </button>
-                <button type="button" onClick={() => changeMonth(1)} className="p-1 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400">
-                  <ChevronRight size={16} />
-                </button>
+                <button type="button" onClick={() => changeMonth(-1)} className="p-1 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400"><ChevronLeft size={16} /></button>
+                <button type="button" onClick={() => changeMonth(1)} className="p-1 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 dark:text-slate-400"><ChevronRight size={16} /></button>
               </div>
             </div>
-
             <div className="grid grid-cols-7 mb-2">
-              {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map(d => (
-                <div key={d} className="text-center text-[10px] font-bold text-slate-400 uppercase">
-                  {d}
-                </div>
-              ))}
+              {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map(d => <div key={d} className="text-center text-[10px] font-bold text-slate-400 uppercase">{d}</div>)}
             </div>
-
-            {/* Calendar Grid (Z-Index lower than dropdowns) */}
-            <div className="grid grid-cols-7 gap-1 relative z-0">
-              {renderCalendarDays()}
-            </div>
-
+            <div className="grid grid-cols-7 gap-1 relative z-0">{renderCalendarDays()}</div>
             <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800 flex justify-between">
                <button type="button" onClick={() => { onChange({ target: { value: '' } }); setIsOpen(false); }} className="text-xs text-slate-400 hover:text-red-500">Clear</button>
-               <button type="button" onClick={() => { 
-                 const today = new Date();
-                 const formatted = `${today.getFullYear()}-${(today.getMonth()+1).toString().padStart(2,'0')}-${today.getDate().toString().padStart(2,'0')}`;
-                 onChange({ target: { value: formatted } });
-                 setIsOpen(false);
-               }} className="text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline">Today</button>
+               <button type="button" onClick={() => { const today = new Date(); const formatted = `${today.getFullYear()}-${(today.getMonth()+1).toString().padStart(2,'0')}-${today.getDate().toString().padStart(2,'0')}`; onChange({ target: { value: formatted } }); setIsOpen(false); }} className="text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline">Today</button>
             </div>
           </div>
         )}

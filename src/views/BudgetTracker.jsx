@@ -2,21 +2,16 @@ import React, { useState, useMemo } from 'react';
 import { 
   Plus, 
   Search, 
-  Filter, 
-  LayoutGrid, 
   Edit2, 
   Trash2, 
   CheckCircle2, 
-  DollarSign, 
   Save, 
   CreditCard, 
-  Calendar, 
   Landmark,
   Download,
   Settings,
   X,
-  AlertTriangle,
-  Check
+  AlertTriangle
 } from 'lucide-react';
 import Button from '../components/Button';
 import Modal from '../components/Modal';
@@ -30,8 +25,9 @@ const BudgetTracker = ({ items, setItems, rooms, setRooms, categories, setCatego
   const [isManageListsOpen, setIsManageListsOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
   
-  // Deletion State
-  const [itemToDelete, setItemToDelete] = useState(null);
+  // Unified Deletion State
+  // deleteTarget structure: { type: 'item' | 'room' | 'category', id: string/number, name: string }
+  const [deleteTarget, setDeleteTarget] = useState(null); 
   const [confirmDeletePref, setConfirmDeletePref] = useLocalStorage(true, 're4b-confirm-delete');
   const [dontAskChecked, setDontAskChecked] = useState(false);
 
@@ -114,29 +110,71 @@ const BudgetTracker = ({ items, setItems, rooms, setRooms, categories, setCatego
     handleCancel();
   };
 
-  const handleDeleteClick = (id) => {
+  // --- Unified Deletion Logic ---
+
+  // 1. Trigger: Expense Item
+  const handleDeleteItemClick = (id) => {
     if (!confirmDeletePref) {
-      performDelete(id);
+      performDeleteItem(id);
     } else {
-      setItemToDelete(id);
+      const item = items.find(i => i.id === id);
+      setDeleteTarget({ type: 'item', id, name: item?.name || 'Expense' });
       setDontAskChecked(false);
     }
   };
 
-  const performDelete = (id) => {
+  const performDeleteItem = (id) => {
     setItems(items.filter(i => i.id !== id));
     if (editingId === id) handleCancel();
-    setItemToDelete(null);
+    setDeleteTarget(null);
   };
 
+  // 2. Trigger: Room
+  const handleDeleteRoomClick = (roomName) => {
+    if (!confirmDeletePref) {
+      performDeleteRoom(roomName);
+    } else {
+      setDeleteTarget({ type: 'room', id: roomName, name: roomName });
+      setDontAskChecked(false);
+    }
+  };
+
+  const performDeleteRoom = (roomName) => {
+    setRooms(rooms.filter(r => r !== roomName));
+    if (filterRoom === roomName) setFilterRoom('All Rooms');
+    setDeleteTarget(null);
+  };
+
+  // 3. Trigger: Category
+  const handleDeleteCategoryClick = (catName) => {
+    if (!confirmDeletePref) {
+      performDeleteCategory(catName);
+    } else {
+      setDeleteTarget({ type: 'category', id: catName, name: catName });
+      setDontAskChecked(false);
+    }
+  };
+
+  const performDeleteCategory = (catName) => {
+    setCategories(categories.filter(c => c !== catName));
+    if (filterCategory === catName) setFilterCategory('All Categories');
+    setDeleteTarget(null);
+  };
+
+  // Central Confirm Action
   const confirmDelete = () => {
     if (dontAskChecked) {
       setConfirmDeletePref(false);
     }
-    if (itemToDelete) {
-      performDelete(itemToDelete);
+    
+    if (deleteTarget) {
+      if (deleteTarget.type === 'item') performDeleteItem(deleteTarget.id);
+      else if (deleteTarget.type === 'room') performDeleteRoom(deleteTarget.id);
+      else if (deleteTarget.type === 'category') performDeleteCategory(deleteTarget.id);
     }
   };
+
+  // --- List Management ---
 
   const togglePaid = (id) => {
     setItems(items.map(i => i.id === id ? { ...i, paid: !i.paid } : i));
@@ -149,26 +187,12 @@ const BudgetTracker = ({ items, setItems, rooms, setRooms, categories, setCatego
       setNewRoom('');
     }
   };
-  
-  const handleDeleteRoom = (roomToDelete) => {
-    if (window.confirm(`Delete room "${roomToDelete}"?`)) {
-      setRooms(rooms.filter(r => r !== roomToDelete));
-      if (filterRoom === roomToDelete) setFilterRoom('All Rooms');
-    }
-  };
 
   const handleAddCategory = (e) => {
     e.preventDefault();
     if (newCategory && !categories.includes(newCategory)) {
       setCategories([...categories, newCategory]);
       setNewCategory('');
-    }
-  };
-  
-  const handleDeleteCategory = (catToDelete) => {
-    if (window.confirm(`Delete category "${catToDelete}"?`)) {
-      setCategories(categories.filter(c => c !== catToDelete));
-      if (filterCategory === catToDelete) setFilterCategory('All Categories');
     }
   };
 
@@ -191,10 +215,9 @@ const BudgetTracker = ({ items, setItems, rooms, setRooms, categories, setCatego
   };
 
   const handleInstallmentChange = (e) => {
-    const term = e.target.value; // e.g. "3 Months"
+    const term = e.target.value; 
     const months = parseInt(term.split(' ')[0], 10);
     
-    // Auto-calculate date: Today + N months
     if (!isNaN(months)) {
       const date = new Date();
       date.setMonth(date.getMonth() + months);
@@ -206,7 +229,7 @@ const BudgetTracker = ({ items, setItems, rooms, setRooms, categories, setCatego
         nextPaymentDate: formatted 
       });
     } else {
-      setFormData({ ...formData, installments: '12' }); // Default fallback
+      setFormData({ ...formData, installments: '12' }); 
     }
   };
 
@@ -361,14 +384,13 @@ const BudgetTracker = ({ items, setItems, rooms, setRooms, categories, setCatego
                     <td className="p-4 text-center">
                       <div className="flex items-center justify-center gap-2">
                         <button onClick={() => handleEditClick(item)} className="p-1.5 text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 rounded-lg transition-colors"><Edit2 size={16} /></button>
-                        <button onClick={() => handleDeleteClick(item.id)} className="p-1.5 text-slate-400 hover:text-red-600 dark:hover:text-red-400 rounded-lg transition-colors"><Trash2 size={16} /></button>
+                        <button onClick={() => handleDeleteItemClick(item.id)} className="p-1.5 text-slate-400 hover:text-red-600 dark:hover:text-red-400 rounded-lg transition-colors"><Trash2 size={16} /></button>
                       </div>
                     </td>
                   </tr>
                 );
               })}
             </tbody>
-            {/* Totals Footer */}
             <tfoot className="bg-slate-50 dark:bg-slate-800/50 border-t-2 border-slate-100 dark:border-slate-800">
                <tr>
                  <td colSpan="2" className="p-4 text-sm font-bold text-slate-900 dark:text-white text-right uppercase tracking-wider">Total</td>
@@ -436,7 +458,7 @@ const BudgetTracker = ({ items, setItems, rooms, setRooms, categories, setCatego
                       onChange={e => setTempNewItem(e.target.value)}
                     />
                     <button type="button" onClick={saveInlineCategory} disabled={!tempNewItem} className="p-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-50 transition-colors">
-                       <Check size={16} />
+                       <CheckCircle2 size={16} />
                     </button>
                  </div>
               ) : (
@@ -466,7 +488,7 @@ const BudgetTracker = ({ items, setItems, rooms, setRooms, categories, setCatego
                       onChange={e => setTempNewItem(e.target.value)}
                     />
                     <button type="button" onClick={saveInlineRoom} disabled={!tempNewItem} className="p-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-50 transition-colors">
-                       <Check size={16} />
+                       <CheckCircle2 size={16} />
                     </button>
                  </div>
               ) : (
@@ -477,20 +499,13 @@ const BudgetTracker = ({ items, setItems, rooms, setRooms, categories, setCatego
           
           <Select label="Payment Method" options={PAYMENT_METHODS} value={formData.paymentMethod} onChange={e => setFormData({...formData, paymentMethod: e.target.value})} />
 
-          {/* Conditional Finance Fields */}
           {formData.paymentMethod === 'Finance' && (
              <div className="bg-blue-50 dark:bg-blue-900/10 p-4 rounded-xl space-y-4 border border-blue-100 dark:border-blue-900/30 animate-in fade-in slide-in-from-top-2">
                 <div className="flex items-center gap-2 text-blue-600 dark:text-blue-400 font-bold text-xs uppercase tracking-wide">
                   <Landmark size={14} /> Finance Details
                 </div>
                 <div className="grid grid-cols-2 gap-4">
-                  {/* FIXED: Added handleInstallmentChange here */}
-                  <Select 
-                    label="Term" 
-                    options={['3 Months', '6 Months', '12 Months', '24 Months', '36 Months']} 
-                    value={formData.installments ? `${formData.installments} Months` : '12 Months'} 
-                    onChange={handleInstallmentChange} 
-                  />
+                  <Select label="Term" options={['3 Months', '6 Months', '12 Months', '24 Months', '36 Months']} value={formData.installments ? `${formData.installments} Months` : '12 Months'} onChange={handleInstallmentChange} />
                   <Input label="Provider" placeholder="e.g. Affirm, Klarna" value={formData.financeProvider} onChange={e => setFormData({...formData, financeProvider: e.target.value})} />
                 </div>
                 <DatePicker label="Next Payment Date" value={formData.nextPaymentDate} onChange={e => setFormData({...formData, nextPaymentDate: e.target.value})} />
@@ -508,7 +523,6 @@ const BudgetTracker = ({ items, setItems, rooms, setRooms, categories, setCatego
       {/* Manage Lists Modal */}
       <Modal isOpen={isManageListsOpen} onClose={() => setIsManageListsOpen(false)} title="Manage Lists">
         <div className="grid grid-cols-2 gap-8 min-h-[300px]">
-          {/* Rooms Column */}
           <div className="flex flex-col h-full">
             <h4 className="font-bold text-slate-900 dark:text-white mb-3 text-sm uppercase tracking-wide">Rooms</h4>
             <div className="flex-1 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden mb-3 bg-slate-50 dark:bg-slate-800/50">
@@ -516,23 +530,17 @@ const BudgetTracker = ({ items, setItems, rooms, setRooms, categories, setCatego
                  {rooms.map(room => (
                    <div key={room} className="flex justify-between items-center p-2 bg-white dark:bg-slate-900 rounded-lg border border-slate-100 dark:border-slate-800 group">
                       <span className="text-sm font-medium text-slate-700 dark:text-slate-300">{room}</span>
-                      <button onClick={() => handleDeleteRoom(room)} className="text-slate-300 hover:text-red-500 transition-colors p-1"><X size={14} /></button>
+                      <button onClick={() => handleDeleteRoomClick(room)} className="text-slate-300 hover:text-red-500 transition-colors p-1"><X size={14} /></button>
                    </div>
                  ))}
                </div>
             </div>
             <form onSubmit={handleAddRoom} className="flex gap-2">
-              <input 
-                className="flex-1 p-2 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-sm outline-none focus:border-blue-500"
-                placeholder="New Room..." 
-                value={newRoom}
-                onChange={e => setNewRoom(e.target.value)}
-              />
+              <input className="flex-1 p-2 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-sm outline-none focus:border-blue-500" placeholder="New Room..." value={newRoom} onChange={e => setNewRoom(e.target.value)} />
               <Button variant="secondary" type="submit" disabled={!newRoom} className="px-3"><Plus size={18} /></Button>
             </form>
           </div>
 
-          {/* Categories Column */}
           <div className="flex flex-col h-full">
             <h4 className="font-bold text-slate-900 dark:text-white mb-3 text-sm uppercase tracking-wide">Categories</h4>
             <div className="flex-1 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden mb-3 bg-slate-50 dark:bg-slate-800/50">
@@ -540,18 +548,13 @@ const BudgetTracker = ({ items, setItems, rooms, setRooms, categories, setCatego
                  {categories.map(cat => (
                    <div key={cat} className="flex justify-between items-center p-2 bg-white dark:bg-slate-900 rounded-lg border border-slate-100 dark:border-slate-800 group">
                       <span className="text-sm font-medium text-slate-700 dark:text-slate-300">{cat}</span>
-                      <button onClick={() => handleDeleteCategory(cat)} className="text-slate-300 hover:text-red-500 transition-colors p-1"><X size={14} /></button>
+                      <button onClick={() => handleDeleteCategoryClick(cat)} className="text-slate-300 hover:text-red-500 transition-colors p-1"><X size={14} /></button>
                    </div>
                  ))}
                </div>
             </div>
             <form onSubmit={handleAddCategory} className="flex gap-2">
-               <input 
-                className="flex-1 p-2 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-sm outline-none focus:border-blue-500"
-                placeholder="New Category..." 
-                value={newCategory}
-                onChange={e => setNewCategory(e.target.value)}
-              />
+               <input className="flex-1 p-2 rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-sm outline-none focus:border-blue-500" placeholder="New Category..." value={newCategory} onChange={e => setNewCategory(e.target.value)} />
               <Button variant="secondary" type="submit" disabled={!newCategory} className="px-3"><Plus size={18} /></Button>
             </form>
           </div>
@@ -561,8 +564,8 @@ const BudgetTracker = ({ items, setItems, rooms, setRooms, categories, setCatego
         </div>
       </Modal>
 
-      {/* Confirmation Modal for Deletion */}
-      <Modal isOpen={!!itemToDelete} onClose={() => setItemToDelete(null)} title="Delete Expense">
+      {/* Confirmation Modal */}
+      <Modal isOpen={!!deleteTarget} onClose={() => setDeleteTarget(null)} title={deleteTarget ? `Delete ${deleteTarget.name === 'Expense' ? 'Expense' : deleteTarget.name}?` : "Confirm Delete"}>
         <div className="flex flex-col gap-4">
            <div className="flex items-start gap-4 p-4 bg-red-50 dark:bg-red-900/10 border border-red-100 dark:border-red-900/30 rounded-xl">
               <div className="p-2 bg-red-100 dark:bg-red-900/20 rounded-full text-red-600 dark:text-red-400">
@@ -570,7 +573,7 @@ const BudgetTracker = ({ items, setItems, rooms, setRooms, categories, setCatego
               </div>
               <div>
                 <h4 className="font-bold text-red-900 dark:text-red-300 text-sm uppercase tracking-wide mb-1">Warning</h4>
-                <p className="text-sm text-red-700 dark:text-red-200">Are you sure you want to delete this expense? This action cannot be undone.</p>
+                <p className="text-sm text-red-700 dark:text-red-200">Are you sure you want to delete <strong>{deleteTarget?.name}</strong>? This action cannot be undone.</p>
               </div>
            </div>
            
@@ -586,8 +589,8 @@ const BudgetTracker = ({ items, setItems, rooms, setRooms, categories, setCatego
            </div>
 
            <div className="flex justify-end gap-3 mt-2">
-             <Button variant="secondary" onClick={() => setItemToDelete(null)}>Cancel</Button>
-             <Button variant="danger" onClick={confirmDelete}>Delete Expense</Button>
+             <Button variant="secondary" onClick={() => setDeleteTarget(null)}>Cancel</Button>
+             <Button variant="danger" onClick={confirmDelete}>Delete</Button>
            </div>
         </div>
       </Modal>

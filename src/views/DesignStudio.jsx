@@ -7,7 +7,18 @@ import {
 } from 'lucide-react';
 import Button from '../components/Button';
 import { Input } from '../components/FormElements';
-import API_BASE_URL from '../config'; // Import Config
+import API_BASE_URL from '../config'; 
+
+// --- Import Local Style Images ---
+// Make sure these files exist in src/assets/styles/
+import modernImg from '../assets/styles/Modern.png';
+import contemporaryImg from '../assets/styles/Contemporary.png';
+import minimalistImg from '../assets/styles/Minimalist.png';
+import scandinavianImg from '../assets/styles/Scandinavian.png';
+import industrialImg from '../assets/styles/Industrial.png';
+import traditionalImg from '../assets/styles/Traditional.png';
+import bohemianImg from '../assets/styles/Bohemian.png';
+import midCenturyImg from '../assets/styles/Mid-Century.png'; // Ensure filename matches
 
 // --- UI Components ---
 
@@ -63,7 +74,7 @@ const AccordionSection = ({ id, title, icon: Icon, children, isActive, onToggle,
         </div>
       </button>
       
-      <div className={`grid transition-[grid-template-rows,opacity] duration-500 ease-[cubic-bezier(0.4,0,0.2,1)] ${isActive ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-50'}`}>
+      <div className={`grid transition-[grid-template-rows,opacity] duration-500 ease-in-out ${isActive ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-50'}`}>
         <div className="overflow-hidden">
           <div className="p-4 pt-0">
             <div className="h-px w-full bg-slate-100 dark:bg-slate-800 mb-5"></div>
@@ -86,39 +97,33 @@ const DesignStudio = ({ setGallery, rooms, setRooms }) => {
   const [designHistory, setDesignHistory] = useState([]);
   
   const [toast, setToast] = useState(null);
-  
-  // Suggestion State
   const [suggestion, setSuggestion] = useState(null);
-
-  // Post-Production
   const [editPrompt, setEditPrompt] = useState('');
   const [editRefImage, setEditRefImage] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
-
-  // View State
   const [isMaximized, setIsMaximized] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [activeAccordion, setActiveAccordion] = useState('upload'); 
-
-  // Constraints
   const [maintainStructure, setMaintainStructure] = useState(true);
   const [maintainFurniture, setMaintainFurniture] = useState(true);
-
-  // Data
   const [isAddingRoom, setIsAddingRoom] = useState(false);
   const [newRoom, setNewRoom] = useState('');
-  const [styles, setStyles] = useState([
-    { id: 'modern', name: 'Modern', image: 'https://images.unsplash.com/photo-1534349762230-e0cadf78f5da?auto=format&fit=crop&w=300&q=80' },
-    { id: 'contemporary', name: 'Contemporary', image: 'https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?auto=format&fit=crop&w=300&q=80' },
-    { id: 'minimalist', name: 'Minimalist', image: 'https://images.unsplash.com/photo-1598928506311-c55ded91a20c?auto=format&fit=crop&w=300&q=80' },
-    { id: 'scandinavian', name: 'Scandinavian', image: 'https://images.unsplash.com/photo-1595558486027-d7319e64a0e9?auto=format&fit=crop&w=300&q=80' },
-    { id: 'industrial', name: 'Industrial', image: 'https://images.unsplash.com/photo-1534349762230-e0cadf78f5da?auto=format&fit=crop&w=300&q=80' },
-    { id: 'traditional', name: 'Traditional', image: 'https://images.unsplash.com/photo-1556020685-ae41abfc9365?auto=format&fit=crop&w=300&q=80' },
-    { id: 'bohemian', name: 'Bohemian', image: 'https://images.unsplash.com/photo-1522444195799-478538b28823?auto=format&fit=crop&w=300&q=80' },
-    { id: 'mid-century', name: 'Mid-Century', image: 'https://images.unsplash.com/photo-1567225557594-88d73e55f2cb?auto=format&fit=crop&w=300&q=80' },
-  ]);
+  
   const [isAddingStyle, setIsAddingStyle] = useState(false);
   const [newStyleName, setNewStyleName] = useState('');
+  
+  // UPDATED STYLES: Using imported images
+  const [styles, setStyles] = useState([
+    { id: 'modern', name: 'Modern', image: modernImg },
+    { id: 'contemporary', name: 'Contemporary', image: contemporaryImg },
+    { id: 'minimalist', name: 'Minimalist', image: minimalistImg },
+    { id: 'scandinavian', name: 'Scandinavian', image: scandinavianImg },
+    { id: 'industrial', name: 'Industrial', image: industrialImg },
+    { id: 'traditional', name: 'Traditional', image: traditionalImg },
+    { id: 'bohemian', name: 'Bohemian', image: bohemianImg },
+    { id: 'mid-century', name: 'Mid-Century', image: midCenturyImg },
+  ]);
+
   const [config, setConfig] = useState({ roomType: rooms[0] || 'Kitchen', style: 'Modern', colorPalette: 'Neutral', prompt: '' });
 
   useEffect(() => { if (window.ai) setNanoAvailable(true); }, []);
@@ -178,7 +183,13 @@ const DesignStudio = ({ setGallery, rooms, setRooms }) => {
   const handleAddStyle = (e) => {
     e.preventDefault();
     if (newStyleName) {
-      setStyles([...styles, { id: newStyleName.toLowerCase().replace(/\s+/g, '-'), name: newStyleName, image: 'https://images.unsplash.com/photo-1586023492125-27b2c045efd7?auto=format&fit=crop&w=300&q=80' }]);
+      // For new custom styles, we can't easily "upload" a local file in this context without a file picker
+      // So we'll use a placeholder for custom user-added styles
+      setStyles([...styles, { 
+        id: newStyleName.toLowerCase().replace(/\s+/g, '-'), 
+        name: newStyleName, 
+        image: 'https://images.unsplash.com/photo-1586023492125-27b2c045efd7?auto=format&fit=crop&w=300&q=80' 
+      }]);
       setConfig({ ...config, style: newStyleName });
       setNewStyleName('');
       setIsAddingStyle(false);
@@ -189,7 +200,7 @@ const DesignStudio = ({ setGallery, rooms, setRooms }) => {
     setIsEnhancing(true);
     setSuggestion(null); 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/enhance-prompt`, { // Updated URL
+      const response = await fetch(`${API_BASE_URL}/api/enhance-prompt`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ prompt: config.prompt, style: config.style, roomType: config.roomType, maintainStructure, maintainFurniture })
@@ -227,7 +238,7 @@ const DesignStudio = ({ setGallery, rooms, setRooms }) => {
     const interval = setInterval(() => { stepIndex++; if (stepIndex < steps.length) setProcessingStep(steps[stepIndex]); }, 1500);
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/generate-design`, { // Updated URL
+      const response = await fetch(`${API_BASE_URL}/api/generate-design`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ image: selectedImage, maintainStructure, maintainFurniture, ...activeConfig })
@@ -257,7 +268,7 @@ const DesignStudio = ({ setGallery, rooms, setRooms }) => {
     const interval = setInterval(() => { stepIndex++; if (stepIndex < steps.length) setProcessingStep(steps[stepIndex]); }, 1500);
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/edit-design`, { // Updated URL
+      const response = await fetch(`${API_BASE_URL}/api/edit-design`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ image: generatedImage, editPrompt, referenceImage: editRefImage })
@@ -293,7 +304,6 @@ const DesignStudio = ({ setGallery, rooms, setRooms }) => {
     <div className="space-y-8 animate-in fade-in duration-700 pb-20">
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
       
-      {/* Maximized Modal View */}
       {isMaximized && generatedImage && (
         <div className="fixed inset-0 z-50 bg-black/95 flex items-center justify-center p-4 animate-in fade-in duration-300">
           <button onClick={() => setIsMaximized(false)} className="absolute top-4 right-4 text-white hover:text-slate-300 p-2"><X size={32}/></button>
@@ -369,7 +379,6 @@ const DesignStudio = ({ setGallery, rooms, setRooms }) => {
                  </button>
                </div>
                
-               {/* Suggestion Review Card */}
                {suggestion && (
                  <div className="mb-3 p-3 bg-purple-50 dark:bg-purple-900/20 border border-purple-100 dark:border-purple-900/50 rounded-xl animate-in fade-in slide-in-from-top-2">
                    <div className="flex items-start gap-2 mb-2">
