@@ -26,7 +26,6 @@ const BudgetTracker = ({ items, setItems, rooms, setRooms, categories, setCatego
   const [editingId, setEditingId] = useState(null);
   
   // Unified Deletion State
-  // deleteTarget structure: { type: 'item' | 'room' | 'category', id: string/number, name: string }
   const [deleteTarget, setDeleteTarget] = useState(null); 
   const [confirmDeletePref, setConfirmDeletePref] = useLocalStorage(true, 're4b-confirm-delete');
   const [dontAskChecked, setDontAskChecked] = useState(false);
@@ -40,8 +39,10 @@ const BudgetTracker = ({ items, setItems, rooms, setRooms, categories, setCatego
   const [isAddingCategory, setIsAddingCategory] = useState(false);
   const [tempNewItem, setTempNewItem] = useState(''); 
 
+  // Filters
   const [filterRoom, setFilterRoom] = useState('All Rooms');
   const [filterCategory, setFilterCategory] = useState('All Categories');
+  const [filterPayment, setFilterPayment] = useState('All Payments'); // NEW
   const [searchTerm, setSearchTerm] = useState('');
   
   const initialFormState = {
@@ -52,20 +53,25 @@ const BudgetTracker = ({ items, setItems, rooms, setRooms, categories, setCatego
 
   const [formData, setFormData] = useState(initialFormState);
 
-  const stats = useMemo(() => {
-    const totalEst = items.reduce((acc, i) => acc + Number(i.estimated), 0);
-    const totalPaid = items.reduce((acc, i) => acc + Number(i.actual || 0), 0);
-    const remaining = totalEst - totalPaid;
-    const paidItems = items.filter(i => i.paid).length;
-    return { totalEst, totalPaid, remaining, paidItems };
-  }, [items]);
+  // --- 1. Filter Logic (Moved Up) ---
+  const filteredItems = useMemo(() => {
+    return items.filter(item => {
+      const matchesRoom = filterRoom === 'All Rooms' || item.room === filterRoom;
+      const matchesCat = filterCategory === 'All Categories' || item.category === filterCategory;
+      const matchesPayment = filterPayment === 'All Payments' || item.paymentMethod === filterPayment; // NEW
+      const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase());
+      return matchesRoom && matchesCat && matchesPayment && matchesSearch;
+    });
+  }, [items, filterRoom, filterCategory, filterPayment, searchTerm]);
 
-  const filteredItems = items.filter(item => {
-    const matchesRoom = filterRoom === 'All Rooms' || item.room === filterRoom;
-    const matchesCat = filterCategory === 'All Categories' || item.category === filterCategory;
-    const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase());
-    return matchesRoom && matchesCat && matchesSearch;
-  });
+  // --- 2. Dynamic Stats (Calculated from Filtered Items) ---
+  const stats = useMemo(() => {
+    const totalEst = filteredItems.reduce((acc, i) => acc + Number(i.estimated), 0);
+    const totalPaid = filteredItems.reduce((acc, i) => acc + Number(i.actual || 0), 0);
+    const remaining = totalEst - totalPaid;
+    const paidItems = filteredItems.filter(i => i.paid).length;
+    return { totalEst, totalPaid, remaining, paidItems };
+  }, [filteredItems]);
 
   // --- Handlers ---
   
@@ -112,7 +118,6 @@ const BudgetTracker = ({ items, setItems, rooms, setRooms, categories, setCatego
 
   // --- Unified Deletion Logic ---
 
-  // 1. Trigger: Expense Item
   const handleDeleteItemClick = (id) => {
     if (!confirmDeletePref) {
       performDeleteItem(id);
@@ -129,7 +134,6 @@ const BudgetTracker = ({ items, setItems, rooms, setRooms, categories, setCatego
     setDeleteTarget(null);
   };
 
-  // 2. Trigger: Room
   const handleDeleteRoomClick = (roomName) => {
     if (!confirmDeletePref) {
       performDeleteRoom(roomName);
@@ -145,7 +149,6 @@ const BudgetTracker = ({ items, setItems, rooms, setRooms, categories, setCatego
     setDeleteTarget(null);
   };
 
-  // 3. Trigger: Category
   const handleDeleteCategoryClick = (catName) => {
     if (!confirmDeletePref) {
       performDeleteCategory(catName);
@@ -161,7 +164,6 @@ const BudgetTracker = ({ items, setItems, rooms, setRooms, categories, setCatego
     setDeleteTarget(null);
   };
 
-  // Central Confirm Action
   const confirmDelete = () => {
     if (dontAskChecked) {
       setConfirmDeletePref(false);
@@ -262,13 +264,32 @@ const BudgetTracker = ({ items, setItems, rooms, setRooms, categories, setCatego
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <StatCard label="Total Budget" value={`${currencySymbol}${stats.totalEst.toLocaleString()}`} type="neutral" />
-        <StatCard label="Paid So Far" value={`${currencySymbol}${stats.totalPaid.toLocaleString()}`} subValue={`${((stats.totalPaid / stats.totalEst) * 100).toFixed(1)}%`} type="blue" />
-        <StatCard label="Remaining Balance" value={`${currencySymbol}${Math.abs(stats.remaining).toLocaleString()}`} subValue={stats.remaining >= 0 ? "Left to Spend" : "Over Budget"} type={stats.remaining >= 0 ? "positive" : "negative"} />
-        <StatCard label="Items Settled" value={`${stats.paidItems} / ${items.length}`} subValue="Marked as Paid" type="neutral" />
+        <StatCard 
+          label="Total Budget" 
+          value={`${currencySymbol}${stats.totalEst.toLocaleString()}`} 
+          type="neutral" 
+        />
+        <StatCard 
+          label="Paid So Far" 
+          value={`${currencySymbol}${stats.totalPaid.toLocaleString()}`} 
+          subValue={stats.totalEst > 0 ? `${((stats.totalPaid / stats.totalEst) * 100).toFixed(1)}%` : '0%'} 
+          type="blue" 
+        />
+        <StatCard 
+          label="Remaining Balance" 
+          value={`${currencySymbol}${Math.abs(stats.remaining).toLocaleString()}`} 
+          subValue={stats.remaining >= 0 ? "Left to Spend" : "Over Budget"} 
+          type={stats.remaining >= 0 ? "positive" : "negative"} 
+        />
+        <StatCard 
+          label="Items Settled" 
+          value={`${stats.paidItems} / ${filteredItems.length}`} 
+          subValue="Marked as Paid" 
+          type="neutral" 
+        />
       </div>
 
-      {/* Filter Bar */}
+      {/* Filter Bar with Payment Filter */}
       <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col md:flex-row gap-4 items-center">
         <div className="relative flex-1 w-full">
           <Search className="absolute left-3 top-2.5 text-slate-400" size={18} />
@@ -280,16 +301,17 @@ const BudgetTracker = ({ items, setItems, rooms, setRooms, categories, setCatego
             onChange={e => setSearchTerm(e.target.value)}
           />
         </div>
-        <div className="flex gap-2 w-full md:w-auto">
-          <Select options={['All Categories', ...categories]} value={filterCategory} onChange={e => setFilterCategory(e.target.value)} className="w-full md:w-48" />
-          <Select options={['All Rooms', ...rooms]} value={filterRoom} onChange={e => setFilterRoom(e.target.value)} className="w-full md:w-48" />
+        <div className="flex gap-2 w-full md:w-auto overflow-x-auto pb-2 md:pb-0">
+          <Select options={['All Categories', ...categories]} value={filterCategory} onChange={e => setFilterCategory(e.target.value)} className="min-w-[140px]" />
+          <Select options={['All Rooms', ...rooms]} value={filterRoom} onChange={e => setFilterRoom(e.target.value)} className="min-w-[140px]" />
+          <Select options={['All Payments', ...PAYMENT_METHODS]} value={filterPayment} onChange={e => setFilterPayment(e.target.value)} className="min-w-[140px]" />
         </div>
       </div>
 
       {/* Budget List Table */}
       <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden flex flex-col">
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse table-fixed">
+          <table className="w-full text-left border-collapse table-fixed min-w-[800px]">
             <thead>
               <tr className="bg-slate-50 dark:bg-slate-800/50 border-b border-slate-200 dark:border-slate-800">
                 <th className="w-[30%] p-4 text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Item & Room</th>
@@ -302,6 +324,13 @@ const BudgetTracker = ({ items, setItems, rooms, setRooms, categories, setCatego
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+              {filteredItems.length === 0 && (
+                <tr>
+                  <td colSpan="7" className="p-8 text-center text-slate-400 text-sm italic">
+                    No expenses found matching your filters.
+                  </td>
+                </tr>
+              )}
               {filteredItems.map((item) => {
                 const diff = item.estimated - (item.actual || 0);
                 let balanceLabel = '';
@@ -458,7 +487,7 @@ const BudgetTracker = ({ items, setItems, rooms, setRooms, categories, setCatego
                       onChange={e => setTempNewItem(e.target.value)}
                     />
                     <button type="button" onClick={saveInlineCategory} disabled={!tempNewItem} className="p-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-50 transition-colors">
-                       <CheckCircle2 size={16} />
+                       <Check size={16} />
                     </button>
                  </div>
               ) : (
@@ -488,7 +517,7 @@ const BudgetTracker = ({ items, setItems, rooms, setRooms, categories, setCatego
                       onChange={e => setTempNewItem(e.target.value)}
                     />
                     <button type="button" onClick={saveInlineRoom} disabled={!tempNewItem} className="p-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-50 transition-colors">
-                       <CheckCircle2 size={16} />
+                       <Check size={16} />
                     </button>
                  </div>
               ) : (
