@@ -42,7 +42,7 @@ const BudgetTracker = ({ items, setItems, rooms, setRooms, categories, setCatego
   // Filters
   const [filterRoom, setFilterRoom] = useState('All Rooms');
   const [filterCategory, setFilterCategory] = useState('All Categories');
-  const [filterPayment, setFilterPayment] = useState('All Payments'); // NEW
+  const [filterPayment, setFilterPayment] = useState('All Payments');
   const [searchTerm, setSearchTerm] = useState('');
   
   const initialFormState = {
@@ -53,18 +53,18 @@ const BudgetTracker = ({ items, setItems, rooms, setRooms, categories, setCatego
 
   const [formData, setFormData] = useState(initialFormState);
 
-  // --- 1. Filter Logic (Moved Up) ---
+  // --- 1. Filter Logic ---
   const filteredItems = useMemo(() => {
     return items.filter(item => {
       const matchesRoom = filterRoom === 'All Rooms' || item.room === filterRoom;
       const matchesCat = filterCategory === 'All Categories' || item.category === filterCategory;
-      const matchesPayment = filterPayment === 'All Payments' || item.paymentMethod === filterPayment; // NEW
+      const matchesPayment = filterPayment === 'All Payments' || item.paymentMethod === filterPayment;
       const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase());
       return matchesRoom && matchesCat && matchesPayment && matchesSearch;
     });
   }, [items, filterRoom, filterCategory, filterPayment, searchTerm]);
 
-  // --- 2. Dynamic Stats (Calculated from Filtered Items) ---
+  // --- 2. Dynamic Stats ---
   const stats = useMemo(() => {
     const totalEst = filteredItems.reduce((acc, i) => acc + Number(i.estimated), 0);
     const totalPaid = filteredItems.reduce((acc, i) => acc + Number(i.actual || 0), 0);
@@ -289,8 +289,8 @@ const BudgetTracker = ({ items, setItems, rooms, setRooms, categories, setCatego
         />
       </div>
 
-      {/* Filter Bar with Payment Filter */}
-      <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col md:flex-row gap-4 items-center">
+      {/* Filter Bar - FIXED DROPDOWN ISSUE */}
+      <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm flex flex-col md:flex-row gap-4 items-center relative z-10">
         <div className="relative flex-1 w-full">
           <Search className="absolute left-3 top-2.5 text-slate-400" size={18} />
           <input 
@@ -301,15 +301,17 @@ const BudgetTracker = ({ items, setItems, rooms, setRooms, categories, setCatego
             onChange={e => setSearchTerm(e.target.value)}
           />
         </div>
-        <div className="flex gap-2 w-full md:w-auto overflow-x-auto pb-2 md:pb-0">
-          <Select options={['All Categories', ...categories]} value={filterCategory} onChange={e => setFilterCategory(e.target.value)} className="min-w-[140px]" />
-          <Select options={['All Rooms', ...rooms]} value={filterRoom} onChange={e => setFilterRoom(e.target.value)} className="min-w-[140px]" />
-          <Select options={['All Payments', ...PAYMENT_METHODS]} value={filterPayment} onChange={e => setFilterPayment(e.target.value)} className="min-w-[140px]" />
+        
+        {/* Removed overflow-x-auto to allow dropdowns to float visible */}
+        <div className="flex flex-wrap gap-2 w-full md:w-auto">
+          <Select options={['All Categories', ...categories]} value={filterCategory} onChange={e => setFilterCategory(e.target.value)} className="min-w-[140px] flex-1 md:flex-none" />
+          <Select options={['All Rooms', ...rooms]} value={filterRoom} onChange={e => setFilterRoom(e.target.value)} className="min-w-[140px] flex-1 md:flex-none" />
+          <Select options={['All Payments', ...PAYMENT_METHODS]} value={filterPayment} onChange={e => setFilterPayment(e.target.value)} className="min-w-[140px] flex-1 md:flex-none" />
         </div>
       </div>
 
       {/* Budget List Table */}
-      <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden flex flex-col">
+      <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden flex flex-col z-0">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse table-fixed min-w-[800px]">
             <thead>
@@ -487,7 +489,7 @@ const BudgetTracker = ({ items, setItems, rooms, setRooms, categories, setCatego
                       onChange={e => setTempNewItem(e.target.value)}
                     />
                     <button type="button" onClick={saveInlineCategory} disabled={!tempNewItem} className="p-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-50 transition-colors">
-                       <Check size={16} />
+                       <CheckCircle2 size={16} />
                     </button>
                  </div>
               ) : (
@@ -517,7 +519,7 @@ const BudgetTracker = ({ items, setItems, rooms, setRooms, categories, setCatego
                       onChange={e => setTempNewItem(e.target.value)}
                     />
                     <button type="button" onClick={saveInlineRoom} disabled={!tempNewItem} className="p-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-50 transition-colors">
-                       <Check size={16} />
+                       <CheckCircle2 size={16} />
                     </button>
                  </div>
               ) : (
